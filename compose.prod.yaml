@@ -105,6 +105,12 @@ services:
       - POSTHOG_SECRET_KEY
       - AI_CONTENT_BUCKET
       - APP_NAME
+      # operator console, Stack page: modes, sender, and the install.site key of each on-box tool
+      - STACK_MODES
+      - MAIL_FROM
+      - CRM_PUBLIC_URL
+      - UMAMI_PUBLIC_URL
+      - VAULT_PUBLIC_URL
       - WEBHOOK_ENCRYPTION_KEYS
       - WEBHOOK_MAX_PAYLOAD_BYTES
       - API_KEY_RATE_LIMIT_PER_MINUTE

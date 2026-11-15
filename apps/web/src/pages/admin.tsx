@@ -2,7 +2,7 @@
 // enforces access (/api/admin, requireOperator); this layout only shows what it answers.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
-import { ArrowLeft, Building2, ShieldAlert, Users } from 'lucide-react';
+import { ArrowLeft, Building2, Layers, ShieldAlert, Users } from 'lucide-react';
 import { type FormEvent, type ReactNode, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -218,6 +218,9 @@ export function AdminShell() {
           <Link to="/admin/users" className={navLink} activeProps={{ className: navActive }}>
             <Users className="size-4" /> Users
           </Link>
+          <Link to="/admin/stack" className={navLink} activeProps={{ className: navActive }}>
+            <Layers className="size-4" /> Stack
+          </Link>
         </nav>
         <div className="border-t p-3 text-xs text-muted-foreground">
           <p className="truncate">{me.data.email}</p>
@@ -230,6 +233,7 @@ export function AdminShell() {
         <header className="flex h-12 items-center gap-4 border-b px-4 text-sm md:hidden">
           <Link to="/admin">Organizations</Link>
           <Link to="/admin/users">Users</Link>
+          <Link to="/admin/stack">Stack</Link>
         </header>
         <main className="flex-1 p-4 md:p-8">
           <Outlet />

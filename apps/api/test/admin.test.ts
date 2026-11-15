@@ -182,6 +182,38 @@ describe('operator access', () => {
   });
 });
 
+describe('stack (docs/admin.md "Stack")', () => {
+  it('lists the catalog with how each component runs here and whether it answers', async () => {
+    expect((await get(owner, '/api/admin/stack')).statusCode).toBe(403);
+    const res = await get(op, '/api/admin/stack');
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      reported: boolean;
+      profile: { name: string };
+      components: { id: string; mode: string | null; status: string; group: string }[];
+    };
+    expect(body.reported).toBe(true); // STACK_MODES from .env.example
+    const by = Object.fromEntries(body.components.map((c) => [c.id, c]));
+    expect(by.core).toMatchObject({ mode: 'install', status: 'up', group: 'app' });
+    expect(by.postgres).toMatchObject({ mode: 'install', status: 'up', group: 'base' });
+    expect(by.s3).toMatchObject({ mode: 'install', status: 'up' });
+    expect(by.smtp).toMatchObject({ mode: 'connect', status: 'unchecked' });
+    expect(by.crm).toMatchObject({ mode: 'skip', status: 'unchecked', group: 'product' });
+    expect(by.backups).toBeUndefined(); // not available yet in config/components.json
+    expect(by.vault).toMatchObject({ description: expect.stringMatching(/\(Vaultwarden\)$/) });
+    expect(body.components.some((c) => /docs\//.test(JSON.stringify(c)))).toBe(false);
+  });
+
+  it('reads only known modes from STACK_MODES', async () => {
+    const { parseModes } = await import('../src/routes/admin-stack.ts');
+    expect([...parseModes('crm:install, s3:bogus,,vault:skip,:connect')]).toEqual([
+      ['crm', 'install'],
+      ['vault', 'skip'],
+    ]);
+    expect(parseModes(undefined).size).toBe(0);
+  });
+});
+
 describe('organizations', () => {
   it('lists and shows an organization; viewing it is audit-logged', async () => {
     const list = await get(op, `/api/admin/orgs?q=${org.slug}`);

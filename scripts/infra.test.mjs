@@ -96,6 +96,11 @@ test('render: secrets generated once, kept, rotated on request; derived values f
   const { env } = first;
   assert.deepEqual(first.missing, []);
   assert.equal(env.COMPOSE_PROFILES, 'db,s3');
+  // the console's stack page reads how each component runs; every available one is listed
+  assert.match(
+    env.STACK_MODES,
+    /^core:install,postgres:install,s3:install,smtp:connect,.*crm:skip$/,
+  );
   assert.equal(env.DEPLOY_HOST, 'deploy@203.0.113.10');
   assert.match(env.BETTER_AUTH_SECRET, /^[0-9a-f]{64}$/);
   assert.match(env.WEBHOOK_ENCRYPTION_KEYS, /^k1:[0-9a-f]{64}$/);
@@ -143,7 +148,7 @@ test('plan (dry run): key names only, no value, exact text', () => {
       `Plan for production: deploy@203.0.113.10, https://app.example.com, ghcr.io/mihailorama/saas-agent-starter v1.0.0
   components: core install, postgres install, s3 install, smtp connect, analytics install, llm connect, vault install, crm skip
   profiles: + analytics, + vault
-  env keys: ~ S3_ACCESS_KEY_ID (generated), + UMAMI_PUBLIC_URL, + UMAMI_DB_PASSWORD (generated), + UMAMI_APP_SECRET (generated), + UMAMI_ADMIN_PASSWORD (generated), + ANALYTICS_ORIGINS, + VAULT_PUBLIC_URL, + VAULT_DB_PASSWORD (generated), + VAULT_DATABASE_URL, + SSO_VAULTWARDEN_SECRET (generated), + SSO_VAULTWARDEN_REDIRECT_URIS, - POSTHOG_HOST, - POSTHOG_KEY
+  env keys: ~ S3_ACCESS_KEY_ID (generated), + UMAMI_PUBLIC_URL, + UMAMI_DB_PASSWORD (generated), + UMAMI_APP_SECRET (generated), + UMAMI_ADMIN_PASSWORD (generated), + ANALYTICS_ORIGINS, + VAULT_PUBLIC_URL, + VAULT_DB_PASSWORD (generated), + VAULT_DATABASE_URL, + SSO_VAULTWARDEN_SECRET (generated), + SSO_VAULTWARDEN_REDIRECT_URIS, ~ STACK_MODES, - POSTHOG_HOST, - POSTHOG_KEY
   RAM budget (mem_limit): 3.5 GiB of 3.8 GiB on the server
   WARNING: that is more than 90 % of it`,
     );

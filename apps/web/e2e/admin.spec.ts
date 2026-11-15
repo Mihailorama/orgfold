@@ -68,4 +68,13 @@ test('view as user is read-only with a banner; suspend shows members a notice', 
 
   await customer.reload();
   await expect(customer.getByText('This organization is suspended')).toBeVisible();
+
+  // Stack: how each component runs (STACK_MODES), live checks, and the command to add one.
+  await page.getByRole('link', { name: 'Stack' }).first().click();
+  await expect(page.getByRole('heading', { name: 'Stack', exact: true })).toBeVisible();
+  const application = page.getByRole('region', { name: 'Application' });
+  await expect(application.getByRole('button', { name: 'Running' })).toBeVisible();
+  const add = page.getByRole('region', { name: 'Add to the stack' });
+  await add.getByRole('button', { name: 'Add' }).first().click();
+  await expect(page.getByRole('dialog').getByText(/^pnpm run infra -- add /)).toBeVisible();
 });

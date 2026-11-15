@@ -3,6 +3,7 @@
   "components": [
     {
       "id": "core",
+      "title": "Application",
       "tier": "core",
       "description": "API, worker, web, Caddy (TLS), Redis, Temporal",
       "modes": ["install"],
@@ -20,11 +21,12 @@
         },
         "rotate": ["BETTER_AUTH_SECRET"]
       },
-      "keys": ["COMPOSE_PROFILES"],
+      "keys": ["COMPOSE_PROFILES", "STACK_MODES"],
       "verify": "docker compose exec -T api wget -qO- http://127.0.0.1:3000/readyz"
     },
     {
       "id": "postgres",
+      "title": "Database (Postgres)",
       "tier": "core",
       "description": "Postgres for the app and Temporal",
       "modes": ["install", "connect"],
@@ -77,6 +79,7 @@
     },
     {
       "id": "s3",
+      "title": "File storage (S3)",
       "tier": "core",
       "description": "S3 object storage (uploads, AI audit content)",
       "modes": ["install", "connect"],
@@ -142,8 +145,9 @@
     },
     {
       "id": "smtp",
+      "title": "Mail (SMTP)",
       "tier": "core",
-      "description": "Transactional mail (sign-in codes, invitations; skipped, nobody can sign in by email)",
+      "description": "Transactional mail (sign-in codes, invitations); required",
       "modes": ["connect"],
       "connect": [
         {
@@ -164,6 +168,7 @@
     },
     {
       "id": "analytics",
+      "title": "Product analytics",
       "tier": "optional",
       "description": "Product analytics: connect PostHog, or install Umami",
       "modes": ["connect", "install", "skip"],
@@ -205,6 +210,7 @@
     },
     {
       "id": "llm",
+      "title": "AI models",
       "tier": "optional",
       "description": "AI provider for the AI features (project summary)",
       "modes": ["connect", "skip"],
@@ -234,6 +240,7 @@
     },
     {
       "id": "vault",
+      "title": "Password vault",
       "processor": false,
       "tier": "optional",
       "description": "Secrets vault for humans and agents (Vaultwarden; docs/secrets.md)",
@@ -278,6 +285,7 @@
     },
     {
       "id": "backups",
+      "title": "Backups",
       "tier": "optional",
       "description": "pgBackRest backups to an off-site S3 (docs/backups.md)",
       "modes": ["connect", "skip"],
@@ -301,6 +309,7 @@
     },
     {
       "id": "ops",
+      "title": "Workflow console (Temporal UI)",
       "processor": false,
       "tier": "optional",
       "description": "Temporal Web UI on the server's loopback",
@@ -313,6 +322,7 @@
     },
     {
       "id": "pii",
+      "title": "Personal data redaction",
       "processor": false,
       "tier": "optional",
       "description": "Presidio PII redaction sidecar (docs/support.md)",
@@ -325,6 +335,7 @@
     },
     {
       "id": "llm-cli",
+      "title": "AI CLI subscriptions",
       "tier": "optional",
       "description": "Vendor CLI subscriptions as an LLM endpoint (docs/llm-providers.md)",
       "modes": ["install", "skip"],
@@ -337,6 +348,7 @@
     },
     {
       "id": "booking",
+      "title": "Booking (Cal.diy)",
       "tier": "optional",
       "description": "Cal.diy booking (docs/crm.md)",
       "modes": ["install", "connect", "skip"],
@@ -348,6 +360,7 @@
     },
     {
       "id": "observability",
+      "title": "Monitoring",
       "tier": "optional",
       "description": "Errors (Sentry/GlitchTip DSN) and OTLP traces/metrics",
       "modes": ["connect", "skip"],
@@ -355,6 +368,7 @@
     },
     {
       "id": "support",
+      "title": "Service desk (Chatwoot)",
       "tier": "optional",
       "description": "Chatwoot service desk and tracker (docs/support.md)",
       "modes": ["install", "connect", "skip"],
@@ -365,6 +379,7 @@
     },
     {
       "id": "crm",
+      "title": "CRM (Twenty)",
       "tier": "optional",
       "group": "product",
       "description": "Twenty CRM: people, companies and deals from sign-ups and bookings (docs/crm.md)",
@@ -410,6 +425,7 @@
     },
     {
       "id": "billing",
+      "title": "Billing",
       "tier": "optional",
       "description": "Stripe billing (docs/billing.md)",
       "modes": ["connect", "skip"],
@@ -417,6 +433,7 @@
     },
     {
       "id": "langfuse",
+      "title": "LLM tracing (Langfuse)",
       "tier": "optional",
       "description": "Langfuse LLM-ops, self-hosted (ADR 0009)",
       "modes": ["install", "connect", "skip"],

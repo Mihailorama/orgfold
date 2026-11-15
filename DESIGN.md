@@ -146,7 +146,9 @@ that moves the task forward), the current nav item's focus ring, links. Never fo
 
 - `destructive`: errors, invalid fields, irreversible actions. Red text meets 4.5:1 in both
   themes.
-- Success and warning have no tokens on purpose: use neutral toasts with an icon, and words
+- `success`: only the "running" dot of a health status (operator console, Stack page), always
+  next to the word. Not for toasts, buttons or text.
+- Otherwise success and warning have no tokens on purpose: use neutral toasts with an icon, and words
   ("Saved", "Expires in 3 days") instead of more colors. Add a token to `index.css` and this
   file if a product truly needs one; never an ad-hoc `text-green-600`.
 

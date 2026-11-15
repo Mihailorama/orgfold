@@ -223,6 +223,11 @@ const adminUsersRoute = createRoute({
   path: '/users',
   component: lazyRouteComponent(() => import('@/pages/admin-users'), 'AdminUsersPage'),
 });
+const adminStackRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/stack',
+  component: lazyRouteComponent(() => import('@/pages/admin-stack'), 'AdminStackPage'),
+});
 const adminUserRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/users/$userId',
@@ -243,7 +248,13 @@ const router = createRouter({
     acceptTermsRoute,
     unsubscribeRoute,
     aiTransparencyRoute,
-    adminRoute.addChildren([adminOrgsRoute, adminOrgRoute, adminUsersRoute, adminUserRoute]),
+    adminRoute.addChildren([
+      adminOrgsRoute,
+      adminOrgRoute,
+      adminUsersRoute,
+      adminUserRoute,
+      adminStackRoute,
+    ]),
     appRoute.addChildren([
       projectsRoute,
       projectRoute,

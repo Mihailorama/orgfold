@@ -81,6 +81,10 @@ const schema = z
     PRIVACY_EXPORT_INTERVAL_HOURS: z.coerce.number().min(0).default(24),
     /** Shown in authenticator apps (TOTP issuer) and passkey prompts (WebAuthn RP name). */
     APP_NAME: z.string().min(1).default('Workspace'),
+    /** Sender of transactional mail (the worker sends it); shown in the company profile. */
+    MAIL_FROM: z.string().min(1).optional(),
+    /** How each component runs, written by `pnpm run infra` (stack page, docs/admin.md). */
+    STACK_MODES: z.string().optional(),
     /** WebAuthn relying party: registrable domain, defaults to the BETTER_AUTH_URL host. */
     PASSKEY_RP_ID: z.string().min(1).optional(),
     /** Origin(s) passkey ceremonies run on, comma-separated; defaults to BETTER_AUTH_URL's. */

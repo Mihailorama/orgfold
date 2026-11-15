@@ -23,6 +23,9 @@ const s3 = client(env.S3_ENDPOINT);
 // Presigned URLs embed the host, so sign them for the endpoint browsers can reach.
 const signer = client(env.S3_PUBLIC_ENDPOINT ?? env.S3_ENDPOINT);
 
+/** The bucket answers (stack page, routes/admin-stack.ts). */
+export const s3Reachable = () => s3.send(new HeadBucketCommand({ Bucket: env.S3_BUCKET }));
+
 export async function ensureBucket() {
   try {
     await s3.send(new HeadBucketCommand({ Bucket: env.S3_BUCKET }));
