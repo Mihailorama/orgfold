@@ -101,8 +101,11 @@ test('AI transparency page is public', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'How we use AI' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Project summaries' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Support request triage' })).toBeVisible();
-  // One model list per purpose.
-  await expect(page.getByText('claude-haiku-5-5', { exact: false })).toHaveCount(2);
+  await expect(
+    page.getByRole('heading', { name: 'Planning changes to our own systems' }),
+  ).toBeVisible();
+  // One model list per purpose that runs on it.
+  await expect(page.getByText('claude-haiku-5-5', { exact: false })).toHaveCount(3);
 });
 
 test('org admin creates an API key and a webhook endpoint', async ({ page }) => {
