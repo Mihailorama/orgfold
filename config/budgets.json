@@ -1,7 +1,7 @@
 {
   "$comment": "Budgets checked by pnpm check:budgets (docs/quality.md). gateFiles: hash of each gate config (for pyproject.toml only its ruff and pyright tables); change one only on purpose, never to make a check pass, and say why in the PR. suppressionsMax: cap on biome-ignore, @ts-expect-error, noqa, type: ignore, #[allow(...)] lines in code; lower it when you remove some. agentsMdMaxBytes: cap on AGENTS.md; move details to docs/.",
   "gateFiles": {
-    "biome.json": "16253d37784b1aa8",
+    "biome.json": "651627d8ba691974",
     "tsconfig.base.json": "ba684e25c898ea83",
     "deny.toml": "08e8cafd2593b0ba",
     "scripts/license-check.mjs": "b3ff172840f0a3aa",
