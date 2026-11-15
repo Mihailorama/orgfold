@@ -8,11 +8,15 @@
 # executes: the Depot CLI (`@depot/cli`, a remote-build client: docker/docker, grpc and Go stdlib
 # CVEs) and esbuild's binaries (Go stdlib crypto/tls CVE-2025-68121; esbuild makes no TLS
 # connections). Found 2026-11-07 at REF 2eb48ecc; everything else in the image passes.
+# CVEs listed in infra/caldiy/trivyignore: kernel bugs reported against linux-libc-dev, the kernel
+# headers package of the Debian base. A container runs the host's kernel, never this one.
 set -eu
 image=${1:?usage: infra/caldiy/scan.sh <image>}
 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "$(cd "$(dirname "$0")" && pwd)/trivyignore:/trivyignore:ro" \
   ghcr.io/aquasecurity/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222 \
   image --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1 \
+  --ignorefile /trivyignore \
   --skip-files calcom/node_modules/@depot/cli-linux-x64/bin/depot \
   --skip-files calcom/node_modules/@esbuild/linux-x64/bin/esbuild \
   --skip-files calcom/node_modules/trigger.dev/node_modules/@esbuild/linux-x64/bin/esbuild \
