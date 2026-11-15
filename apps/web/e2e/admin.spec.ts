@@ -75,7 +75,7 @@ test('view as user is read-only with a banner; suspend shows members a notice', 
   await expect(page.getByRole('heading', { name: 'Stack', exact: true })).toBeVisible();
   await expectAccessibleInBothThemes(page, 'admin-stack');
   const application = page.getByRole('region', { name: 'Application' });
-  await expect(application.getByRole('button', { name: 'Running' })).toBeVisible();
+  await expect(application.getByText('Running', { exact: true })).toBeVisible();
   const add = page.getByRole('region', { name: 'Add to the stack' });
   await add.getByRole('button', { name: 'Add' }).first().click();
   await expect(page.getByRole('dialog').getByText(/^pnpm run infra -- add /)).toBeVisible();

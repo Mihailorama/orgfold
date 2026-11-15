@@ -18,7 +18,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Section } from '@/pages/admin';
@@ -56,18 +55,10 @@ const MODE: Record<Mode, string> = {
   connect: 'Connected',
   skip: 'Not added',
 };
-const STATUS: Record<Status, { label: string; dot: string; hint: string }> = {
-  up: { label: 'Running', dot: 'bg-success', hint: 'Answered the check just now.' },
-  down: {
-    label: 'Not answering',
-    dot: 'bg-destructive',
-    hint: 'Did not answer within 3 seconds. Run pnpm run infra -- verify for details.',
-  },
-  unchecked: {
-    label: 'Not checked here',
-    dot: 'bg-muted-foreground',
-    hint: 'The console cannot reach it directly. pnpm run infra -- verify checks it.',
-  },
+const STATUS: Record<Status, { label: string; dot: string }> = {
+  up: { label: 'Running', dot: 'bg-success' },
+  down: { label: 'Not answering', dot: 'bg-destructive' },
+  unchecked: { label: 'Not checked here', dot: 'bg-muted-foreground' },
 };
 
 const gib = (mib: number) => `${(mib / 1024).toFixed(1)} GiB`;
@@ -142,6 +133,12 @@ function StackBody({ stack }: { stack: Stack }) {
             <dd className="font-medium tabular-nums">{gib(ram)}</dd>
           </div>
         </dl>
+      )}
+      {stack.reported && (
+        <p className="text-sm text-muted-foreground">
+          Each check gives up after 3 seconds. Mail and services connected from outside are not
+          reachable from here: pnpm run infra -- verify checks them and explains a failure.
+        </p>
       )}
 
       <Section
@@ -241,15 +238,10 @@ function Row({ c, titleOf }: { c: Component; titleOf: (id: string) => string }) 
 function StatusDot({ status }: { status: Status }) {
   const s = STATUS[status];
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button type="button" className="flex items-center gap-2 rounded-sm text-sm">
-          <span className={cn('size-2 rounded-full', s.dot)} aria-hidden />
-          {s.label}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent>{s.hint}</TooltipContent>
-    </Tooltip>
+    <span className="flex items-center gap-2 text-sm">
+      <span className={cn('size-2 rounded-full', s.dot)} aria-hidden />
+      {s.label}
+    </span>
   );
 }
 
