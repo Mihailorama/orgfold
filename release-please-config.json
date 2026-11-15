@@ -16,5 +16,5 @@
     { "type": "build", "section": "Build", "hidden": true },
     { "type": "style", "section": "Style", "hidden": true }
   ],
-  "packages": { ".": {} }
+  "packages": { ".": { "initial-version": "0.1.0" } }
 }
