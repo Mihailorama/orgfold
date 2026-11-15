@@ -68,12 +68,13 @@ the account's role to `user`.
   (SAASSTARTER-98).
 - **Stack, Plan a change**: the operator writes what the company needs; the planning agent
   (purpose `stack.plan`, docs/ai/stack.plan.md, worker/stack.py) answers with a reply and a plan
-  made only of catalog actions (a component and one of its modes; never `core`). Nothing changes
+  made only of catalog actions (a component and one of its modes) outside the base: the app, the
+  database, S3 and mail change only through `pnpm run infra`. Nothing changes
   on the servers from the page: "Approve plan" needs a sign-in of the last 10 minutes (email code
   and TOTP) and the stack the plan was made for (`STACK_MODES` unchanged since), and writes
   `operator.stack_plan.approved`. Then `pnpm run infra -- apply <id>` on the admin's machine reads
   the plan over SSH (`apps/api/src/stack-plan.ts` in the API container: SSH is the authorization),
-  checks the same three things again, asks for any address or key a `connect` needs, shows the
+  checks the same three things again (a re-run after a failed apply resumes the same plan), asks for any address or key a `connect` needs, shows the
   infrastructure plan, applies it once and marks it applied. Plans are `stack_plans` rows (not
   tenant data). Off until `AI_STACK_PLAN_PROVIDER`, `AI_STACK_PLAN_MODEL` and `STACK_AI_ORG_ID`
   (the operator's own organization, for the AI audit rows) are set on the worker.

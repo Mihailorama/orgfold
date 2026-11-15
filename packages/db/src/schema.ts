@@ -506,9 +506,8 @@ export const stackPlans = pgTable(
     actions: jsonb('actions').$type<{ component: string; mode: string }[]>(),
     stackVersion: text('stack_version').notNull(),
     aiCallId: uuid('ai_call_id').references(() => aiCalls.id, { onDelete: 'set null' }),
-    createdBy: text('created_by')
-      .notNull()
-      .references(() => user.id, { onDelete: 'cascade' }),
+    /** Kept when the operator's account is deleted: the plan stays in the record. */
+    createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
     approvedBy: text('approved_by').references(() => user.id, { onDelete: 'set null' }),
     approvedAt: timestamp('approved_at', { withTimezone: true }),
     appliedAt: timestamp('applied_at', { withTimezone: true }),

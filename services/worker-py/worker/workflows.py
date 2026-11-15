@@ -89,7 +89,8 @@ class StackPlanWorkflow:
             return await workflow.execute_activity_method(
                 StackActivities.plan,
                 p,
-                start_to_close_timeout=timedelta(minutes=2),
+                # Above AI_CLI_TIMEOUT_SECONDS (330 s): a slow CLI call must not run twice.
+                start_to_close_timeout=timedelta(minutes=6),
                 retry_policy=RetryPolicy(initial_interval=timedelta(seconds=5), maximum_attempts=3),
             )
         except ActivityError:

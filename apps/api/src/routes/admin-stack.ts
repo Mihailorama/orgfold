@@ -220,7 +220,16 @@ export const adminStackRoutes: FastifyPluginAsyncZod<{ redis: Redis }> = async (
         })
         .returning();
       if (!row) throw new Error('insert returned no row');
-      await startStackPlan({ planId: row.id });
+      try {
+        await startStackPlan({ planId: row.id });
+      } catch (err) {
+        // Not left "drafting" forever (the page polls while a plan drafts).
+        await db
+          .update(stackPlans)
+          .set({ status: 'failed', reply: 'Could not start the planning agent. Try again later.' })
+          .where(eq(stackPlans.id, row.id));
+        throw err;
+      }
       return reply.code(201).send(toPlan(row));
     },
   );

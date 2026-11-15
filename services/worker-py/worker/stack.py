@@ -18,7 +18,7 @@ from temporalio import activity
 
 from worker import prompts
 from worker.activities import ModelChoice
-from worker.ai import Gateway, Message
+from worker.ai import Gateway, Message, ModelNotAllowed
 from worker.tracker import obj
 
 PURPOSE = "stack.plan"
@@ -35,7 +35,7 @@ class StackPlan:
 
 
 def load_catalog(path: Path) -> list[dict[str, Any]]:
-    """The components an operator can change (available, not core), as the model sees them."""
+    """The components a plan may change (available, outside the base), as the model sees them."""
     return [
         {
             "id": c["id"],
@@ -46,7 +46,8 @@ def load_catalog(path: Path) -> list[dict[str, Any]]:
             "requires": c.get("requires") or {},
         }
         for c in json.loads(path.read_text())["components"]
-        if c.get("available") is not False and c["id"] != "core"
+        # The base (core, database, S3, mail) changes only through `pnpm run infra`.
+        if c.get("available") is not False and c.get("tier") != "core"
     ]
 
 
@@ -119,8 +120,26 @@ class StackActivities:
             await self._finish(p, "off", f"The planning agent is off: {how}.", [], None)
             return "off"
         modes = parse_modes(row["stack_version"])
+        try:
+            result = await self._call(row, modes)
+        except ModelNotAllowed as e:  # configuration, not a passing failure: say what to fix
+            await self._finish(p, "off", f"The planning agent is off: {e}.", [], None)
+            return "off"
+        parsed = parse_plan(result.text, self.catalog, modes)
+        if parsed is None:
+            await self._finish(
+                p, "failed", "Could not make a plan. Ask again in other words.", [], result.call_id
+            )
+            return "failed"
+        reply, actions = parsed
+        await self._finish(p, "ready", reply, actions, result.call_id)
+        activity.logger.info("stack plan %s ready, %d action(s)", p.planId, len(actions))
+        return "ready"
+
+    async def _call(self, row: Any, modes: dict[str, str]) -> Any:
+        assert self.ai is not None and self.model is not None
         prompt = prompts.load(*PLAN_PROMPT)
-        result = await self.ai.call_llm(
+        return await self.ai.call_llm(
             PURPOSE,
             [
                 Message("system", prompt.text),
@@ -134,16 +153,6 @@ class StackActivities:
             prompt_template_version=prompt.version,
             max_tokens=1500,
         )
-        parsed = parse_plan(result.text, self.catalog, modes)
-        if parsed is None:
-            await self._finish(
-                p, "failed", "Could not make a plan. Ask again in other words.", [], result.call_id
-            )
-            return "failed"
-        reply, actions = parsed
-        await self._finish(p, "ready", reply, actions, result.call_id)
-        activity.logger.info("stack plan %s ready, %d action(s)", p.planId, len(actions))
-        return "ready"
 
     @activity.defn(name="stack_plan_failed")
     async def failed(self, p: StackPlan) -> None:

@@ -1,5 +1,5 @@
 {
-  "id": "119274b7-1711-4837-bad0-ba03cfae5666",
+  "id": "aba106b9-2154-4d66-8b73-d1b575ff46ef",
   "prevId": "ef86de6c-3089-4b19-90b1-14fffda568bd",
   "version": "7",
   "dialect": "postgresql",
@@ -1209,7 +1209,7 @@
           "name": "created_by",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "approved_by": {
           "name": "approved_by",
@@ -1278,7 +1278,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "set null",
           "onUpdate": "no action"
         },
         "stack_plans_approved_by_user_id_fk": {

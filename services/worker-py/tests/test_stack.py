@@ -26,7 +26,8 @@ def test_parse_plan_keeps_only_catalog_actions_that_change_something():
             "actions": [
                 {"component": "crm", "mode": "install"},
                 {"component": "crm", "mode": "install"},  # duplicate
-                {"component": "core", "mode": "skip"},  # never core
+                {"component": "core", "mode": "skip"},  # never the base
+                {"component": "postgres", "mode": "connect"},
                 {"component": "langfuse", "mode": "install"},  # not available yet
                 {"component": "smtp", "mode": "skip"},  # not a mode smtp has
                 {"component": "vault", "mode": "install"},  # already so

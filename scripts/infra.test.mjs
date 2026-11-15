@@ -255,9 +255,12 @@ test('a plan from the Stack page runs only approved, for the same stack, catalog
   assert.deepEqual(checkPlan(plan(), modes), { crm: 'install' });
   assert.match(checkPlan(plan({ status: 'ready' }), modes), /approve it on the Stack page/);
   assert.match(checkPlan(plan({ status: 'applied' }), modes), /ran already/);
-  assert.match(checkPlan(plan(), 'core:install,crm:install'), /stack changed/);
+  assert.match(checkPlan(plan(), 'core:install,crm:connect'), /stack changed/);
+  // An apply that failed after writing the env: the same plan resumes.
+  assert.deepEqual(checkPlan(plan(), 'crm:install,core:install'), { crm: 'install' });
   for (const action of [
     { component: 'core', mode: 'skip' },
+    { component: 'postgres', mode: 'connect' }, // the base changes only through infra itself
     { component: 'langfuse', mode: 'install' }, // not available yet
     { component: 'smtp', mode: 'skip' }, // not one of its modes
     { component: 'nope', mode: 'install' },

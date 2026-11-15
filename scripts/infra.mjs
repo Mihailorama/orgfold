@@ -555,21 +555,31 @@ export function command(words) {
   return { cmd, only, planId, words: rest };
 }
 
+const modesOf = (s) => Object.fromEntries((s ?? '').split(',').map((p) => p.split(':')));
+const sameModes = (x, y) =>
+  Object.keys({ ...x, ...y }).every((id) => (x[id] ?? 'skip') === (y[id] ?? 'skip'));
+
 /**
  * A plan from the Stack page (docs/admin.md "Plan a change") as component -> mode, or an error:
- * it must be approved, made for the stack as it is now (STACK_MODES), and only catalog actions.
+ * it must be approved, made for the stack as it is now (STACK_MODES; or as the plan leaves it,
+ * when an earlier apply of it failed after writing the env), and only catalog actions outside
+ * the base (the database, S3 and mail change only through `pnpm run infra`).
  */
 export function checkPlan(plan, stackModes) {
   if (plan.status !== 'approved') {
     return `the plan is ${plan.status}: ${plan.status === 'applied' ? 'it ran already' : 'approve it on the Stack page first'}`;
   }
-  if (plan.stackVersion !== (stackModes ?? '')) {
+  const made = modesOf(plan.stackVersion);
+  const after = { ...made };
+  for (const { component, mode } of plan.actions ?? []) after[component] = mode;
+  const now = modesOf(stackModes);
+  if (!plan.stackVersion || !(sameModes(made, now) || sameModes(after, now))) {
     return 'the stack changed since this plan was made: ask again on the Stack page';
   }
   const fixed = {};
   for (const { component, mode } of plan.actions ?? []) {
     const c = byId[component];
-    if (!c || c.id === 'core' || c.available === false || !c.modes.includes(mode)) {
+    if (!c || c.tier === 'core' || c.available === false || !c.modes.includes(mode)) {
       return `the plan has an action outside the catalog: ${component} ${mode}`;
     }
     fixed[component] = mode;
@@ -648,7 +658,10 @@ async function main() {
   if (planId) {
     fixed = checkPlan(stackPlan(current, planId, 'get'), current.STACK_MODES);
     if (typeof fixed === 'string') die(`plan ${planId}: ${fixed}`);
-    for (const [id, mode] of Object.entries(fixed)) (a.components[id] ??= {}).mode = mode;
+    for (const [id, mode] of Object.entries(fixed)) {
+      a.components[id] ??= {};
+      a.components[id].mode = mode;
+    }
   }
   const confirm = interactive ? await ask(a, current, secrets, only, fixed) : undefined;
   const errors = validateAnswers(a);

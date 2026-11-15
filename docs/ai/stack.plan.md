@@ -18,7 +18,7 @@
   (`STACK_MODES`, no secrets). Basis: running the service.
 - Output and where it is shown; how it is labeled: a reply and a list of actions on the Stack
   page under "Plan a change". Actions outside the catalog, with a mode it does not list, for
-  `core`, or that change nothing are dropped before they are stored (worker/stack.py).
+  the base (core, database, S3, mail), or that change nothing are dropped before they are stored (worker/stack.py).
 - Human oversight: an operator approves the plan with a sign-in of the last 10 minutes (email
   code and TOTP); `pnpm run infra -- apply <id>` on their machine checks it again (approved, same
   `STACK_MODES`, catalog actions only), shows the infrastructure plan and asks before it runs it
