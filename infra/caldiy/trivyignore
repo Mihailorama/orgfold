@@ -1,0 +1,3 @@
+# linux-libc-dev (kernel headers in the Debian base): ksmbd heap overflow in the kernel itself.
+# Found 2026-11-15; the container runs on the host's kernel. Drop once the base image has 6.1.192.
+CVE-2026-99083
