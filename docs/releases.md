@@ -31,8 +31,8 @@ releases by hand from a feature branch.
 
 Only `feat`, `fix` and `deps` commits make release-please open a release PR
 ([its README](https://github.com/googleapis/release-please#release-please-bot-does-not-create-a-release-pr-why));
-the first release starts from `0.0.0` (`.release-please-manifest.json`), so the first `feat`
-makes it `v0.1.0`.
+the first release is `v0.1.0` (`initial-version` in `release-please-config.json`; without it
+release-please starts at `1.0.0`). `1.0.0` comes once a clean install of a release works unattended.
 
 Write `feat`/`fix` summaries for users: what changed for them, not how ("fix: AI summary no
 longer disappears after a correction", not "fix: invalidate query key"). Internal work uses a
