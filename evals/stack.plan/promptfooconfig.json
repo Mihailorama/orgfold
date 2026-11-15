@@ -1,0 +1,28 @@
+{
+  "description": "stack.plan: golden set (synthetic requests, no customer data)",
+  "gate": {
+    "prompt": { "id": "stack.plan/system", "version": 1 },
+    "judge": { "id": "judge/stack.plan", "version": 1 },
+    "purpose": "stack.plan",
+    "minScore": 0.85
+  },
+  "prompts": ["file://../prompt.mjs"],
+  "providers": [{ "id": "claude_cli:claude-sonnet-5-5", "config": { "max_tokens": 1500 } }],
+  "defaultTest": {
+    "options": { "provider": "claude_cli:claude-opus-5-5" },
+    "assert": [
+      {
+        "type": "javascript",
+        "metric": "actions",
+        "value": "JSON.stringify(JSON.parse(output.slice(output.indexOf('{'), output.lastIndexOf('}') + 1)).actions.map(a => `${a.component}:${a.mode}`).sort()) === JSON.stringify([...context.vars.expected].sort())"
+      },
+      {
+        "type": "javascript",
+        "metric": "has_reply",
+        "value": "Boolean(JSON.parse(output.slice(output.indexOf('{'), output.lastIndexOf('}') + 1)).reply)"
+      },
+      { "type": "llm-rubric", "metric": "judge", "value": "See the judge prompt criteria." }
+    ]
+  },
+  "tests": "file://dataset.jsonl"
+}

@@ -1,8 +1,11 @@
 // Operator console, Stack page (docs/admin.md "Stack"): every component of the company's stack
-// with how it runs and whether it answers now. Read only: changes are `pnpm run infra -- add <id>`
-// on the admin's machine, which shows a plan and changes nothing until approved.
-import { useQuery } from '@tanstack/react-query';
+// with how it runs and whether it answers now. Changes run on the admin's machine
+// (`pnpm run infra -- add <id>`, or `apply <id>` for a plan made and approved here), which shows
+// the plan and changes nothing until approved.
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { Copy, ExternalLink, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { PageContainer, PageHeader } from '@/components/patterns/page-header';
 import { QueryView } from '@/components/patterns/states';
@@ -18,7 +21,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
+import { authClient } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { Section } from '@/pages/admin';
 
@@ -36,6 +41,15 @@ type Component = {
   ramMiB: number | null;
   requires: Record<string, string[]>;
   status: Status;
+};
+type Plan = {
+  id: string;
+  request: string;
+  status: 'drafting' | 'ready' | 'failed' | 'off' | 'approved' | 'applied';
+  reply: string | null;
+  actions: { component: string; mode: Mode }[];
+  current: boolean;
+  createdAt: string;
 };
 type Stack = {
   profile: { name: string; address: string; mailFrom: string | null };
@@ -151,6 +165,8 @@ function StackBody({ stack }: { stack: Stack }) {
           <Fact label="Mail sender" value={stack.profile.mailFrom ?? 'Not set'} />
         </dl>
       </Section>
+
+      {stack.reported && <PlanSection titleOf={titleOf} />}
 
       {stack.reported &&
         GROUPS.map(([g, label]) => {
@@ -284,21 +300,7 @@ function ChangeDialog({ c, titleOf }: { c: Component; titleOf: (id: string) => s
         </ul>
         <div className="space-y-2">
           <p className="text-sm">Run there:</p>
-          <div className="flex items-center gap-2 rounded-md border bg-muted px-3 py-2">
-            <code className="min-w-0 flex-1 truncate text-sm">{command}</code>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                navigator.clipboard.writeText(command).then(
-                  () => toast('Command copied'),
-                  () => toast.error('Could not copy. Select the command and copy it.'),
-                )
-              }
-            >
-              <Copy /> Copy
-            </Button>
-          </div>
+          <Command command={command} />
           <p className="text-sm text-muted-foreground">
             It asks how, shows the plan with the memory it needs, and changes nothing until you
             approve it.
@@ -306,5 +308,174 @@ function ChangeDialog({ c, titleOf }: { c: Component; titleOf: (id: string) => s
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function Command({ command }: { command: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md border bg-muted px-3 py-2">
+      <code className="min-w-0 flex-1 truncate text-sm">{command}</code>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() =>
+          navigator.clipboard.writeText(command).then(
+            () => toast('Command copied'),
+            () => toast.error('Could not copy. Select the command and copy it.'),
+          )
+        }
+      >
+        <Copy /> Copy
+      </Button>
+    </div>
+  );
+}
+
+const VERB: Record<Mode, string> = {
+  install: 'Install on this server',
+  connect: 'Connect the existing one',
+  skip: 'Remove from the stack',
+};
+const PLAN_STATUS: Record<Plan['status'], string> = {
+  drafting: 'Planning',
+  ready: 'Waiting for approval',
+  failed: 'No plan',
+  off: 'Agent off',
+  approved: 'Approved',
+  applied: 'Applied',
+};
+const NOT_FRESH = 'approving needs a recent sign-in: sign in again, then approve';
+
+/** "Plan a change": the agent turns a request into catalog actions (docs/admin.md). */
+function PlanSection({ titleOf }: { titleOf: (id: string) => string }) {
+  const queryClient = useQueryClient();
+  const [request, setRequest] = useState('');
+  const plans = useQuery({
+    queryKey: ['admin', 'stack', 'plans'],
+    queryFn: () => api<Plan[]>('/api/admin/stack/plans'),
+    refetchInterval: (q) => (q.state.data?.some((p) => p.status === 'drafting') ? 3000 : false),
+  });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin', 'stack', 'plans'] });
+  const make = useMutation({
+    mutationFn: () => api<Plan>('/api/admin/stack/plans', { method: 'POST', json: { request } }),
+    onSuccess: async () => {
+      setRequest('');
+      await refresh();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <Section
+      title="Plan a change"
+      description="Say what the company needs. The agent plans it from the catalog; nothing changes until you approve the plan and run it."
+    >
+      <div className="space-y-6">
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            make.mutate();
+          }}
+        >
+          <label htmlFor="stack-request" className="sr-only">
+            What should change
+          </label>
+          <Textarea
+            id="stack-request"
+            value={request}
+            onChange={(e) => setRequest(e.target.value)}
+            placeholder="For example: we need a CRM for the sales team"
+            maxLength={2000}
+          />
+          <Button type="submit" disabled={request.trim().length < 3 || make.isPending}>
+            Make a plan
+          </Button>
+        </form>
+        {plans.data?.length ? (
+          <ul className="divide-y" aria-label="Plans">
+            {plans.data.map((p) => (
+              <PlanItem key={p.id} plan={p} titleOf={titleOf} onDone={refresh} />
+            ))}
+          </ul>
+        ) : null}
+      </div>
+    </Section>
+  );
+}
+
+function PlanItem({
+  plan,
+  titleOf,
+  onDone,
+}: {
+  plan: Plan;
+  titleOf: (id: string) => string;
+  onDone: () => Promise<unknown>;
+}) {
+  const navigate = useNavigate();
+  const [stale, setStale] = useState(false);
+  const approve = useMutation({
+    mutationFn: () => api<Plan>(`/api/admin/stack/plans/${plan.id}/approve`, { method: 'POST' }),
+    onSuccess: onDone,
+    onError: (e) => (e.message === NOT_FRESH ? setStale(true) : toast.error(e.message)),
+  });
+  const open = plan.status === 'ready' || plan.status === 'approved';
+
+  return (
+    <li className="space-y-3 py-4 first:pt-0 last:pb-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="min-w-0 flex-1 basis-56 font-medium">{plan.request}</span>
+        <Badge variant={plan.status === 'approved' ? 'default' : 'secondary'}>
+          {plan.status === 'ready' && !plan.actions.length ? 'Answered' : PLAN_STATUS[plan.status]}
+        </Badge>
+      </div>
+      {plan.reply && <p className="text-sm text-muted-foreground">{plan.reply}</p>}
+      {plan.actions.length > 0 && (
+        <ol className="list-decimal space-y-1 pl-5 text-sm">
+          {plan.actions.map((a) => (
+            <li key={a.component}>
+              {VERB[a.mode]}: {titleOf(a.component)}
+            </li>
+          ))}
+        </ol>
+      )}
+      {open && !plan.current && (
+        <p className="text-sm text-muted-foreground">
+          The stack changed since this plan was made. Ask again for a new plan.
+        </p>
+      )}
+      {plan.status === 'ready' && plan.current && plan.actions.length > 0 && (
+        <Button size="sm" onClick={() => approve.mutate()} disabled={approve.isPending}>
+          Approve plan
+        </Button>
+      )}
+      {stale && (
+        <Alert>
+          <AlertTitle>Confirm it is you</AlertTitle>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+            Approving a plan needs a sign-in in the last 10 minutes. Sign in again, then approve.
+            <Button
+              size="sm"
+              onClick={async () => {
+                await authClient.signOut();
+                navigate({ to: '/sign-in', search: { redirect: '/admin/stack' } });
+              }}
+            >
+              Sign in again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      {plan.status === 'approved' && plan.current && (
+        <div className="space-y-2">
+          <p className="text-sm">
+            Run it from the machine you set up the servers from. It shows what changes, asks for any
+            address or key, and runs the plan once:
+          </p>
+          <Command command={`pnpm run infra -- apply ${plan.id}`} />
+        </div>
+      )}
+    </li>
   );
 }

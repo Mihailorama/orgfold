@@ -11,7 +11,7 @@ import { bearerToken, httpError } from '../tenant.ts';
 
 /** Shared by the operator console routes (admin.ts, admin-orgs.ts, admin-users.ts). */
 
-export type Operator = { id: string; email: string };
+export type Operator = { id: string; email: string; signedInAt: number };
 declare module 'fastify' {
   interface FastifyRequest {
     operator: Operator;
@@ -38,7 +38,11 @@ export async function requireOperator(req: FastifyRequest, reply: FastifyReply) 
   if (age > env.OPERATOR_SESSION_MAX_AGE_MINUTES * 60_000) {
     return reply.code(401).send({ error: 'operator session expired: sign in again' });
   }
-  req.operator = { id: s.user.id, email: s.user.email };
+  req.operator = {
+    id: s.user.id,
+    email: s.user.email,
+    signedInAt: new Date(s.session.createdAt).getTime(),
+  };
 }
 
 export const Reason = z.string().trim().min(3).max(500);
@@ -74,6 +78,10 @@ export function audit(
     expiresAt,
   });
 }
+
+/** A platform-level action's audit row (org_id null, operators only), inside the caller's `tx`. */
+export const auditPlatform = (tx: Tx, req: FastifyRequest, action: string, target: string) =>
+  withPlatformAudit(tx, () => audit(tx, req, null, action, target, null));
 
 /**
  * A user-level action and its audit rows in ONE transaction: `change` runs first, then one row in

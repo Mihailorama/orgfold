@@ -1,12 +1,23 @@
 import { readFileSync } from 'node:fs';
-import { sql } from 'drizzle-orm';
+import { stackPlans } from '@app/db';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Redis } from 'ioredis';
 import { z } from 'zod';
 import { db } from '../db.ts';
 import { env } from '../env.ts';
+import { REAUTH_MAX_AGE_SECONDS } from '../mfa.ts';
 import { s3Reachable } from '../s3.ts';
-import { errorHandler, requireOperator } from './admin-common.ts';
+import { startStackPlan } from '../temporal.ts';
+import { httpError } from '../tenant.ts';
+import {
+  auditPlatform,
+  ErrorBody,
+  errorHandler,
+  Id,
+  iso,
+  requireOperator,
+} from './admin-common.ts';
 
 /**
  * The company's stack in the operator console (docs/admin.md "Stack"): every component of
@@ -54,6 +65,33 @@ const Stack = z.object({
   components: z.array(Component),
 });
 export type StackComponent = z.infer<typeof Component>;
+
+const Plan = z.object({
+  id: z.string(),
+  request: z.string(),
+  status: z.enum(['drafting', 'ready', 'failed', 'off', 'approved', 'applied']),
+  reply: z.string().nullable(),
+  actions: z.array(z.object({ component: z.string(), mode: Mode })),
+  /** Made for the stack as it is now; false = it changed since, the plan cannot be approved. */
+  current: z.boolean(),
+  createdAt: z.string(),
+  approvedAt: z.string().nullable(),
+  appliedAt: z.string().nullable(),
+});
+type PlanRow = typeof stackPlans.$inferSelect;
+const toPlan = (p: PlanRow): z.infer<typeof Plan> => ({
+  id: p.id,
+  request: p.request,
+  status: p.status as z.infer<typeof Plan>['status'],
+  reply: p.reply,
+  actions: (p.actions ?? []) as z.infer<typeof Plan>['actions'],
+  current: p.stackVersion === stackVersion(),
+  createdAt: iso(p.createdAt) ?? '',
+  approvedAt: iso(p.approvedAt),
+  appliedAt: iso(p.appliedAt),
+});
+/** The stack a plan is made for: STACK_MODES itself (scripts/infra.mjs compares it at apply). */
+const stackVersion = () => env.STACK_MODES ?? '';
 
 /** STACK_MODES=postgres:install,smtp:connect,... (written by scripts/infra.mjs). */
 export function parseModes(raw: string | undefined) {
@@ -141,6 +179,84 @@ export const adminStackRoutes: FastifyPluginAsyncZod<{ redis: Redis }> = async (
         checkedAt: new Date().toISOString(),
         components,
       };
+    },
+  );
+
+  // "Plan a change" (docs/admin.md): the agent turns a request into catalog actions; nothing on
+  // the servers changes here. The admin approves with a recent sign-in (email code + 2FA), and
+  // `pnpm run infra -- apply <id>` on their machine runs it once, as approved.
+  app.get(
+    '/stack/plans',
+    {
+      preHandler: requireOperator,
+      schema: { tags: ['admin'], hide: true, response: { 200: z.array(Plan) } },
+    },
+    async () =>
+      (await db.select().from(stackPlans).orderBy(desc(stackPlans.createdAt)).limit(20)).map(
+        toPlan,
+      ),
+  );
+  app.post(
+    '/stack/plans',
+    {
+      preHandler: requireOperator,
+      schema: {
+        tags: ['admin'],
+        hide: true,
+        body: z.object({ request: z.string().trim().min(3).max(2000) }),
+        response: { 201: Plan, 409: ErrorBody },
+      },
+    },
+    async (req, reply) => {
+      if (!stackVersion()) {
+        throw httpError(409, 'this server has not reported its components yet (Stack page)');
+      }
+      const [row] = await db
+        .insert(stackPlans)
+        .values({
+          request: req.body.request,
+          stackVersion: stackVersion(),
+          createdBy: req.operator.id,
+        })
+        .returning();
+      if (!row) throw new Error('insert returned no row');
+      await startStackPlan({ planId: row.id });
+      return reply.code(201).send(toPlan(row));
+    },
+  );
+  app.post(
+    '/stack/plans/:id/approve',
+    {
+      preHandler: requireOperator,
+      schema: {
+        tags: ['admin'],
+        hide: true,
+        params: Id,
+        response: { 200: Plan, 401: ErrorBody, 404: ErrorBody, 409: ErrorBody },
+      },
+    },
+    async (req) => {
+      if (Date.now() - req.operator.signedInAt > REAUTH_MAX_AGE_SECONDS * 1000) {
+        throw httpError(401, 'approving needs a recent sign-in: sign in again, then approve');
+      }
+      const [plan] = await db.select().from(stackPlans).where(eq(stackPlans.id, req.params.id));
+      if (!plan) throw httpError(404, 'no such plan');
+      if (plan.stackVersion !== stackVersion()) {
+        throw httpError(409, 'the stack changed since this plan was made: ask again');
+      }
+      if (plan.status !== 'ready' || !plan.actions?.length) {
+        throw httpError(409, 'only a ready plan with actions can be approved');
+      }
+      return db.transaction(async (tx) => {
+        const [row] = await tx
+          .update(stackPlans)
+          .set({ status: 'approved', approvedBy: req.operator.id, approvedAt: new Date() })
+          .where(and(eq(stackPlans.id, plan.id), eq(stackPlans.status, 'ready')))
+          .returning();
+        if (!row) throw httpError(409, 'only a ready plan with actions can be approved');
+        await auditPlatform(tx, req, 'stack_plan.approved', row.id);
+        return toPlan(row);
+      });
     },
   );
 };

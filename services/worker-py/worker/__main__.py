@@ -35,6 +35,7 @@ from worker.privacy import PrivacyActivities, configured_tools
 from worker.providers import load_providers, providers_from_config
 from worker.rewards import RewardActivities, load_rules, same_domain_blocked
 from worker.s3 import S3
+from worker.stack import StackActivities, load_catalog
 from worker.support import Chatwoot, SupportActivities
 from worker.telegram import Bot, TelegramActivities
 from worker.text import backend
@@ -52,6 +53,7 @@ from worker.workflows import (
     ProjectCreatedWorkflow,
     RewardWorkflow,
     SendEmailWorkflow,
+    StackPlanWorkflow,
     SupportIssueClosedWorkflow,
     SupportTriageWorkflow,
     TelegramChatWorkflow,
@@ -233,6 +235,15 @@ async def main() -> None:
         and await flags.is_enabled("telegram-support", user_id="telegram")
     ):
         await telegram.register_webhook(s.TELEGRAM_SUPPORT_WEBHOOK_URL)
+    stack = StackActivities(
+        pool=pool,
+        ai=ai,
+        model=ModelChoice(settings.AI_STACK_PLAN_PROVIDER, settings.AI_STACK_PLAN_MODEL)
+        if settings.AI_STACK_PLAN_PROVIDER and settings.AI_STACK_PLAN_MODEL
+        else None,
+        ai_org_id=settings.STACK_AI_ORG_ID,
+        catalog=load_catalog(settings.COMPONENTS_FILE),
+    )
     support = SupportActivities(
         telegram=telegram,
         chatwoot=chatwoot,
@@ -276,6 +287,7 @@ async def main() -> None:
             ContractPeriodWorkflow,
             CrmSyncWorkflow,
             SupportTriageWorkflow,
+            StackPlanWorkflow,
             SupportIssueClosedWorkflow,
             TelegramChatWorkflow,
             TrackerItemWorkflow,
@@ -300,6 +312,8 @@ async def main() -> None:
             rewards.apply,
             rewards.record,
             crm.sync,
+            stack.plan,
+            stack.failed,
             support.triage,
             support.issue_closed,
             *([telegram.handle] if telegram else []),

@@ -59,14 +59,14 @@
       {
         "provider": "claude_cli",
         "model": "claude-haiku-5-5",
-        "purposes": ["project.summary", "support.triage"],
+        "purposes": ["project.summary", "support.triage", "stack.plan"],
         "unmetered": true,
         "fallback": { "provider": "anthropic", "model": "claude-haiku-5-5" }
       },
       {
         "provider": "claude_cli",
         "model": "claude-sonnet-5-5",
-        "purposes": ["project.summary", "support.triage"],
+        "purposes": ["project.summary", "support.triage", "stack.plan"],
         "unmetered": true,
         "fallback": { "provider": "anthropic", "model": "claude-sonnet-5-5" }
       },
@@ -79,24 +79,24 @@
       {
         "provider": "codex_cli",
         "model": "gpt-5.5",
-        "purposes": ["project.summary", "support.triage"],
+        "purposes": ["project.summary", "support.triage", "stack.plan"],
         "unmetered": true
       },
       {
         "provider": "gemini_cli",
         "model": "gemini-3.5-flash",
-        "purposes": ["project.summary", "support.triage"],
+        "purposes": ["project.summary", "support.triage", "stack.plan"],
         "unmetered": true
       },
       {
         "provider": "anthropic",
         "model": "claude-haiku-5-5",
-        "purposes": ["project.summary", "support.triage"]
+        "purposes": ["project.summary", "support.triage", "stack.plan"]
       },
       {
         "provider": "anthropic",
         "model": "claude-sonnet-5-5",
-        "purposes": ["project.summary", "judge", "support.triage"]
+        "purposes": ["project.summary", "judge", "support.triage", "stack.plan"]
       },
       {
         "provider": "vllm",

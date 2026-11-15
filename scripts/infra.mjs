@@ -465,7 +465,7 @@ function vaultPush(a, env, generated) {
   }
 }
 
-async function ask(a, current, secrets, only) {
+async function ask(a, current, secrets, only, fixed) {
   const p = await import('@clack/prompts');
   const ok = (v) => {
     if (!p.isCancel(v)) return v;
@@ -488,9 +488,9 @@ async function ask(a, current, secrets, only) {
     const options = c.modes.map((m) => ({ value: m, label: c.labels?.[m] ?? LABEL[m] }));
     const initialValue = ca.mode ?? c.modes[0];
     const message = c.ask ? `${c.ask} (${c.description})` : `${c.id}: ${c.description}`;
-    if (c.modes.length === 1) {
+    if (c.modes.length === 1 || fixed?.[c.id]) {
       p.log.step(message);
-      ca.mode = c.modes[0];
+      ca.mode = fixed?.[c.id] ?? c.modes[0];
     } else ca.mode = ok(await p.select({ message, options, initialValue }));
     if (ca.mode !== 'connect') return;
     for (const f of (c.connect ?? []).flatMap((f) => expandField(f, ca))) {
@@ -514,7 +514,7 @@ async function ask(a, current, secrets, only) {
       }
     }
   };
-  if (!only) {
+  if (!only && !fixed) {
     a.product ??= {};
     a.product.name = await text(
       'What is the product called?',
@@ -527,6 +527,7 @@ async function ask(a, current, secrets, only) {
     );
   }
   if (only) await component(byId[only]);
+  else if (fixed) for (const id of Object.keys(fixed)) await component(byId[id]);
   else {
     a.server.host = await text('Server: IP, host name or ssh alias', a.server.host, '^[\\w.-]+$');
     a.server.admin = await text('Admin user (root, or passwordless sudo)', a.server.admin);
@@ -542,14 +543,49 @@ async function ask(a, current, secrets, only) {
 
 /**
  * The subcommand wherever it stands: `plan staging` and `staging plan` are the same dry run (a
- * misplaced `plan` must never become a setup that applies). `add` takes the next word.
+ * misplaced `plan` must never become a setup that applies). `add` takes the next word (the
+ * component), `apply` too (the plan id from the Stack page).
  */
 export function command(words) {
   const rest = [...words];
-  const i = rest.findIndex((w) => ['plan', 'add', 'verify'].includes(w));
+  const i = rest.findIndex((w) => ['plan', 'add', 'verify', 'apply'].includes(w));
   const cmd = i < 0 ? 'setup' : rest.splice(i, 1)[0];
   const only = cmd === 'add' ? rest.splice(i, 1)[0] : undefined;
-  return { cmd, only, words: rest };
+  const planId = cmd === 'apply' ? rest.splice(i, 1)[0] : undefined;
+  return { cmd, only, planId, words: rest };
+}
+
+/**
+ * A plan from the Stack page (docs/admin.md "Plan a change") as component -> mode, or an error:
+ * it must be approved, made for the stack as it is now (STACK_MODES), and only catalog actions.
+ */
+export function checkPlan(plan, stackModes) {
+  if (plan.status !== 'approved') {
+    return `the plan is ${plan.status}: ${plan.status === 'applied' ? 'it ran already' : 'approve it on the Stack page first'}`;
+  }
+  if (plan.stackVersion !== (stackModes ?? '')) {
+    return 'the stack changed since this plan was made: ask again on the Stack page';
+  }
+  const fixed = {};
+  for (const { component, mode } of plan.actions ?? []) {
+    const c = byId[component];
+    if (!c || c.id === 'core' || c.available === false || !c.modes.includes(mode)) {
+      return `the plan has an action outside the catalog: ${component} ${mode}`;
+    }
+    fixed[component] = mode;
+  }
+  return Object.keys(fixed).length ? fixed : 'the plan has no actions';
+}
+
+/** Reads a plan from the server's database through the API container (SSH is the authorization). */
+function stackPlan(env, id, verb) {
+  const r = ssh(
+    env.DEPLOY_HOST,
+    `cd ${q(env.DEPLOY_PATH)} && docker compose exec -T api node apps/api/src/stack-plan.ts ${verb} ${q(id)}`,
+    { capture: true },
+  );
+  if (r.status !== 0) die(`plan ${id}: ${(r.stderr || r.stdout).trim() || 'could not read it'}`);
+  return JSON.parse(r.stdout);
 }
 
 async function main() {
@@ -558,7 +594,7 @@ async function main() {
   const VALUED = ['--answers', '--rotate', '--org'];
   const opt = (n) => argv[argv.indexOf(n) + 1];
   const rotate = argv.flatMap((x, i) => (x === '--rotate' ? [argv[i + 1]] : []));
-  const { cmd, only, words } = command(
+  const { cmd, only, planId, words } = command(
     argv.filter((x, i) => !x.startsWith('--') && !VALUED.includes(argv[i - 1])),
   );
   const dry = cmd === 'plan' || argv.includes('--dry-run');
@@ -567,11 +603,15 @@ async function main() {
   const file = argv.includes('--answers')
     ? opt('--answers')
     : `deploy/setup/${envName}.answers.json`;
+  if (cmd === 'apply' && !/^[0-9a-f-]{36}$/.test(planId ?? '')) {
+    die('usage: pnpm run infra -- apply <plan id from the Stack page> [environment]');
+  }
   if (only && !byId[only]) die(`unknown component ${only} (config/components.json)`);
   if (only && byId[only].available === false) die(`${only} cannot be added yet (docs/TODO.md)`);
 
   const saved = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : undefined;
-  if (!saved && (!interactive || only)) die(`${file} not found: run pnpm run infra first`);
+  if (!saved && (!interactive || only || planId))
+    die(`${file} not found: run pnpm run infra first`);
   const a = structuredClone(saved) ?? {
     env: envName,
     project: 'app',
@@ -604,7 +644,13 @@ async function main() {
     secrets[k.slice(6)] = v;
     delete process.env[k]; // no child process (ssh, sops, deploy) needs them
   }
-  const confirm = interactive ? await ask(a, current, secrets, only) : undefined;
+  let fixed;
+  if (planId) {
+    fixed = checkPlan(stackPlan(current, planId, 'get'), current.STACK_MODES);
+    if (typeof fixed === 'string') die(`plan ${planId}: ${fixed}`);
+    for (const [id, mode] of Object.entries(fixed)) (a.components[id] ??= {}).mode = mode;
+  }
+  const confirm = interactive ? await ask(a, current, secrets, only, fixed) : undefined;
   const errors = validateAnswers(a);
   if (errors.length) die(`${file}:\n  ${errors.join('\n  ')}`);
   const out = render(a, current, { rotate, secrets, previous: saved });
@@ -622,7 +668,7 @@ async function main() {
     die(`missing secrets: ${out.missing.map((k) => `INFRA_${k}`).join(', ')}`);
   if (confirm && !(await confirm())) process.exit(1);
 
-  if (interactive) writeFileSync(file, `${JSON.stringify(a, null, 2)}\n`);
+  if (interactive || planId) writeFileSync(file, `${JSON.stringify(a, null, 2)}\n`);
   if (toDotenv(current) !== toDotenv(out.env)) encrypt(envFile, out.env);
   bootstrap(a, out.env, interactive);
   const backups = (out.env.COMPOSE_FILE ?? '').includes('compose.backup.yaml');
@@ -643,6 +689,7 @@ async function main() {
     vaultPush(a, out.env, out.generated);
     writeFileSync(file, `${JSON.stringify(a, null, 2)}\n`);
   }
+  if (planId) stackPlan(out.env, planId, 'applied');
   console.log('verify');
   const mailChanged = ['SMTP_URL', 'MAIL_FROM'].some((k) => current[k] !== out.env[k]);
   verify(a, out.env, { org: opt('--org'), mail: mailChanged || argv.includes('--mail') });

@@ -66,6 +66,17 @@ the account's role to `user`.
   before it was added shows a note to run setup (which also deploys the newest release). The page changes nothing: "Add" and
   "Change" give the `pnpm run infra -- add <id>` command, which shows a plan and asks first
   (SAASSTARTER-98).
+- **Stack, Plan a change**: the operator writes what the company needs; the planning agent
+  (purpose `stack.plan`, docs/ai/stack.plan.md, worker/stack.py) answers with a reply and a plan
+  made only of catalog actions (a component and one of its modes; never `core`). Nothing changes
+  on the servers from the page: "Approve plan" needs a sign-in of the last 10 minutes (email code
+  and TOTP) and the stack the plan was made for (`STACK_MODES` unchanged since), and writes
+  `operator.stack_plan.approved`. Then `pnpm run infra -- apply <id>` on the admin's machine reads
+  the plan over SSH (`apps/api/src/stack-plan.ts` in the API container: SSH is the authorization),
+  checks the same three things again, asks for any address or key a `connect` needs, shows the
+  infrastructure plan, applies it once and marks it applied. Plans are `stack_plans` rows (not
+  tenant data). Off until `AI_STACK_PLAN_PROVIDER`, `AI_STACK_PLAN_MODEL` and `STACK_AI_ORG_ID`
+  (the operator's own organization, for the AI audit rows) are set on the worker.
 
 Support conversations: the Chatwoot integration (docs/support.md) stores no link per user or
 organization, so the console shows none. Search Chatwoot's contacts by the user's email or id

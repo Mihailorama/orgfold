@@ -120,6 +120,13 @@
       "when": 1794589930241,
       "tag": "0016_staff_sso",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794777848802,
+      "tag": "0017_stack_plans",
+      "breakpoints": true
     }
   ]
 }
