@@ -13,7 +13,7 @@
 set -eu
 image=${1:?usage: infra/caldiy/scan.sh <image>}
 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-  -v "$(dirname "$0")/trivyignore:/trivyignore:ro" \
+  -v "$(cd "$(dirname "$0")" && pwd)/trivyignore:/trivyignore:ro" \
   ghcr.io/aquasecurity/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222 \
   image --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1 \
   --ignorefile /trivyignore \
