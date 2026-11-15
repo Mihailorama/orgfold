@@ -196,7 +196,7 @@ describe('stack (docs/admin.md "Stack")', () => {
     const by = Object.fromEntries(body.components.map((c) => [c.id, c]));
     expect(by.core).toMatchObject({ mode: 'install', status: 'up', group: 'app' });
     expect(by.postgres).toMatchObject({ mode: 'install', status: 'up', group: 'base' });
-    expect(by.s3).toMatchObject({ mode: 'install', status: 'up' });
+    expect(by.s3).toMatchObject({ mode: 'install', status: 'up', url: null }); // an API, not a UI
     expect(by.smtp).toMatchObject({ mode: 'connect', status: 'unchecked' });
     expect(by.crm).toMatchObject({ mode: 'skip', status: 'unchecked', group: 'product' });
     expect(by.backups).toBeUndefined(); // not available yet in config/components.json

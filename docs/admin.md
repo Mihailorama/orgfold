@@ -58,10 +58,12 @@ the account's role to `user`.
   connected, not added) and whether it answers now: the database and Redis by a query, S3 by
   `HeadBucket`, an on-box tool by a request to its public address (`install.site`; below 500 is
   running, a sign-in redirect included), checked on load, every minute and on "Check again".
-  Others (mail, connected services) say "Not checked here": `pnpm run infra -- verify` checks
-  them. The company block shows `APP_NAME`, the app's address and `MAIL_FROM`. How each component
+  Every probe gives up after 3 seconds. A connected database or S3 is checked the same way; mail
+  and other connected services say "Not checked here" (`pnpm run infra -- verify` checks them).
+  On-box tools are reached at their public address from the API container, so the server must
+  reach its own public IP (true on ordinary VPS hosts); "Open" is offered for those tools. The company block shows `APP_NAME`, the app's address and `MAIL_FROM`. How each component
   runs comes from `STACK_MODES`, which `pnpm run infra` writes (no secrets); a server set up
-  before it was added shows a note to run setup once. The page changes nothing: "Add" and
+  before it was added shows a note to run setup (which also deploys the newest release). The page changes nothing: "Add" and
   "Change" give the `pnpm run infra -- add <id>` command, which shows a plan and asks first
   (SAASSTARTER-98).
 

@@ -121,8 +121,9 @@ function StackBody({ stack }: { stack: Stack }) {
         <Alert>
           <AlertTitle>This server has not reported its components yet</AlertTitle>
           <AlertDescription>
-            Run pnpm run infra -- production once from the machine you set up the servers from. It
-            records how each component runs; nothing else changes.
+            Run pnpm run infra -- production from the machine you set up the servers from: it
+            records how each component runs, and also deploys the newest release. Run pnpm run infra
+            -- plan production first to see what it changes.
           </AlertDescription>
         </Alert>
       )}

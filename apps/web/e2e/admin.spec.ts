@@ -3,6 +3,7 @@
 import { randomUUID } from 'node:crypto';
 import { expect, type Page, test } from '@playwright/test';
 import * as OTPAuth from 'otpauth';
+import { expectAccessibleInBothThemes } from './axe';
 import { acceptTerms, signIn } from './mail';
 
 test.describe.configure({ timeout: 120_000 });
@@ -72,6 +73,7 @@ test('view as user is read-only with a banner; suspend shows members a notice', 
   // Stack: how each component runs (STACK_MODES), live checks, and the command to add one.
   await page.getByRole('link', { name: 'Stack' }).first().click();
   await expect(page.getByRole('heading', { name: 'Stack', exact: true })).toBeVisible();
+  await expectAccessibleInBothThemes(page, 'admin-stack');
   const application = page.getByRole('region', { name: 'Application' });
   await expect(application.getByRole('button', { name: 'Running' })).toBeVisible();
   const add = page.getByRole('region', { name: 'Add to the stack' });

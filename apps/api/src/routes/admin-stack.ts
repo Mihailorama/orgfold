@@ -66,8 +66,12 @@ export function parseModes(raw: string | undefined) {
   return modes;
 }
 
+/** Up when the probe settles within 3 s (a blackholed endpoint must not hang the page). */
 const ok = (p: Promise<unknown>) =>
-  p.then(
+  Promise.race([
+    p,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000).unref()),
+  ]).then(
     () => 'up' as const,
     () => 'down' as const,
   );
@@ -75,7 +79,7 @@ const ok = (p: Promise<unknown>) =>
 /** A public site answers (anything below 500, a sign-in redirect included). */
 const site = (url: string) =>
   ok(
-    fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(3000) }).then((r) => {
+    fetch(url, { redirect: 'manual' }).then((r) => {
       if (r.status >= 500) throw new Error(String(r.status));
     }),
   );
@@ -102,8 +106,9 @@ export const adminStackRoutes: FastifyPluginAsyncZod<{ redis: Redis }> = async (
       const components = await Promise.all(
         catalog.map(async (c) => {
           const mode = modes.get(c.id) ?? null;
-          const key = mode === 'install' ? c.install?.site : undefined;
-          const url = (key && process.env[key]) || null;
+          // "Open" only for tools people use in a browser; S3's site is an API endpoint.
+          const key = mode === 'install' && c.id !== 's3' ? c.install?.site : undefined;
+          const url = (key && z.url().safeParse(process.env[key]).data) || null;
           return {
             id: c.id,
             title: c.title,
