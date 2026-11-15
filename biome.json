@@ -11,6 +11,8 @@
       "!**/migrations/meta",
       "!pnpm-lock.yaml",
       "!DESIGN.md",
+      "!CHANGELOG.md",
+      "!.release-please-manifest.json",
       "!apps/web/src/lib/api.gen.ts"
     ]
   },
