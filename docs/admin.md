@@ -53,6 +53,19 @@ the account's role to `user`.
   session created by the user, not by an operator), created.
 - **User**: organizations and roles, sign-in methods, passkeys, active sessions (start, expiry,
   IP, device; never tokens; operator views marked), and the operator actions on this account.
+- **Stack**: every available component of `config/components.json` (its `title`), grouped as
+  application, base, product tools and team tools, with how it runs here (on this server,
+  connected, not added) and whether it answers now: the database and Redis by a query, S3 by
+  `HeadBucket`, an on-box tool by a request to its public address (`install.site`; below 500 is
+  running, a sign-in redirect included), checked on load, every minute and on "Check again".
+  Every probe gives up after 3 seconds. A connected database or S3 is checked the same way; mail
+  and other connected services say "Not checked here" (`pnpm run infra -- verify` checks them).
+  On-box tools are reached at their public address from the API container, so the server must
+  reach its own public IP (true on ordinary VPS hosts); "Open" is offered for those tools. The company block shows `APP_NAME`, the app's address and `MAIL_FROM`. How each component
+  runs comes from `STACK_MODES`, which `pnpm run infra` writes (no secrets); a server set up
+  before it was added shows a note to run setup (which also deploys the newest release). The page changes nothing: "Add" and
+  "Change" give the `pnpm run infra -- add <id>` command, which shows a plan and asks first
+  (SAASSTARTER-98).
 
 Support conversations: the Chatwoot integration (docs/support.md) stores no link per user or
 organization, so the console shows none. Search Chatwoot's contacts by the user's email or id

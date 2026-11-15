@@ -21,6 +21,7 @@ import { db } from './db.ts';
 import { allowedOrigins, env } from './env.ts';
 import { READ_ONLY } from './operator-guard.ts';
 import { adminRoutes, impersonationRoutes } from './routes/admin.ts';
+import { adminStackRoutes } from './routes/admin-stack.ts';
 import { aiCallRoutes } from './routes/ai-calls.ts';
 import { aiProviderRoutes } from './routes/ai-providers.ts';
 import { apiKeyRoutes } from './routes/api-keys.ts';
@@ -350,6 +351,7 @@ export async function buildApp() {
   await app.register(crmHookRoutes, { prefix: '/api/hooks' });
   await app.register(supportRoutes, { prefix: '/api/support' });
   await app.register(adminRoutes, { prefix: '/api/admin' });
+  await app.register(adminStackRoutes, { prefix: '/api/admin', redis });
   await app.register(impersonationRoutes, { prefix: '/api/impersonation' });
   await app.register(privacyRoutes, { prefix: '/api/privacy' });
   await app.register(legalRoutes, { prefix: '/api/legal' });

@@ -188,6 +188,12 @@ export function render(a, current = {}, { rotate = [], secrets = {}, previous } 
   // Computed here, last: a value kept from `keys` must not move it (a re-run rewrites nothing).
   delete env.COMPOSE_PROFILES;
   env.COMPOSE_PROFILES = profiles.join(',');
+  // How each component runs, for the console's stack page (routes/admin-stack.ts); no secrets.
+  delete env.STACK_MODES;
+  env.STACK_MODES = catalog
+    .filter((c) => c.available !== false)
+    .map((c) => `${c.id}:${modeOf(a, c)}`)
+    .join(',');
   // The answers own APP_NAME only once they name the product; a hand-set one stays until then.
   if (a.product?.name) {
     owned.add('APP_NAME');

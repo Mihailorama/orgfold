@@ -21,6 +21,7 @@ export function checkComponents(components, profiles, keys, exists = () => true)
     ids.add(c.id);
     if (!['core', 'optional'].includes(c.tier)) errors.push(`${at}: tier is core or optional`);
     if (!c.description) errors.push(`${at}: needs a description`);
+    if (!c.title) errors.push(`${at}: needs a title (the console's stack page)`);
     if (!c.modes?.length || c.modes.some((m) => !MODES.has(m))) errors.push(`${at}: bad modes`);
     if (c.modes?.includes('install') && typeof c.install?.ramMiB !== 'number')
       errors.push(`${at}: install needs ramMiB (docs/STACK.md)`);
