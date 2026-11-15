@@ -59,7 +59,8 @@ def parse_modes(raw: str) -> dict[str, str]:
 
 def plan_input(catalog: list[dict[str, Any]], modes: dict[str, str], request: str) -> str:
     """The user message; evals/stack.plan stores exactly this as `input`."""
-    now = {c["id"]: modes.get(c["id"], "skip") for c in catalog}
+    # The base too (read only): `requires` refers to it, e.g. postgres:install.
+    now = {**modes, **{c["id"]: modes.get(c["id"], "skip") for c in catalog}}
     return (
         f"Catalog:\n{json.dumps(catalog, indent=1)}\n\n"
         f"How each component runs now:\n{json.dumps(now)}\n\n"

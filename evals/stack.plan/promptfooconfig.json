@@ -14,7 +14,7 @@
       {
         "type": "javascript",
         "metric": "actions",
-        "value": "JSON.stringify(JSON.parse(output.slice(output.indexOf('{'), output.lastIndexOf('}') + 1)).actions.map(a => `${a.component}:${a.mode}`).sort()) === JSON.stringify([...context.vars.expected].sort())"
+        "value": "JSON.stringify(JSON.parse(output.slice(output.indexOf('{'), output.lastIndexOf('}') + 1)).actions.map(a => `${a.component}:${a.mode}`).sort()) === JSON.stringify(context.vars.expected ? context.vars.expected.split(',') : [])"
       },
       {
         "type": "javascript",
