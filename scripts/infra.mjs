@@ -346,7 +346,13 @@ export function plan({ a, current, next, generated, missing = [], serverMiB, rel
       : []),
     `  RAM budget (mem_limit): ${gib(ram)}${serverMiB ? ` of ${gib(serverMiB)} on the server` : ', server RAM unknown'}`,
   ];
-  if (serverMiB && ram > serverMiB * 0.9) lines.push('  WARNING: that is more than 90 % of it');
+  // Limits are ceilings (idle use is about a third, docs/STACK.md), so this advises, never stops.
+  if (serverMiB && ram > serverMiB * 0.9)
+    lines.push(
+      '  NOTE: the limits add up to more than 90 % of the server. It starts, but under load or with',
+      '  more components later a bigger server is recommended: resize it at your provider (data stays),',
+      '  or run heavy components on a second server and connect them.',
+    );
   return lines.join('\n');
 }
 

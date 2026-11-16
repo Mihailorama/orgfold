@@ -72,7 +72,11 @@ on the server, **connect** one you already have, or **skip** it.
 Everything else (backups to off-site S3, Temporal UI, PII redaction, llm-cli, booking, Chatwoot,
 Stripe, Langfuse, error tracking) is listed in [config/components.json](../config/components.json)
 and comes later through `pnpm run infra -- add <component>` (docs/TODO.md). The plan shows the RAM
-the choices reserve (`mem_limit` sums from [STACK.md](STACK.md)) against the server's RAM.
+the choices reserve (`mem_limit` sums from [STACK.md](STACK.md)) against the server's RAM. The limits
+are ceilings: idle use is about a third of them, so a sum above the server's RAM is a recommendation
+to grow, not a stop. Start on the server you have; when load or new components need more, resize it
+at your provider (the data stays on its disk) or run a heavy component (CRM, support) on a second
+server and connect it.
 
 ## What happens
 

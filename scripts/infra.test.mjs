@@ -152,7 +152,9 @@ test('plan (dry run): key names only, no value, exact text', () => {
   profiles: + analytics, + vault
   env keys: ~ S3_ACCESS_KEY_ID (generated), + UMAMI_PUBLIC_URL, + UMAMI_DB_PASSWORD (generated), + UMAMI_APP_SECRET (generated), + UMAMI_ADMIN_PASSWORD (generated), + ANALYTICS_ORIGINS, + VAULT_PUBLIC_URL, + VAULT_DB_PASSWORD (generated), + VAULT_DATABASE_URL, + SSO_VAULTWARDEN_SECRET (generated), + SSO_VAULTWARDEN_REDIRECT_URIS, ~ STACK_MODES, - POSTHOG_HOST, - POSTHOG_KEY
   RAM budget (mem_limit): 5.5 GiB of 3.8 GiB on the server
-  WARNING: that is more than 90 % of it`,
+  NOTE: the limits add up to more than 90 % of the server. It starts, but under load or with
+  more components later a bigger server is recommended: resize it at your provider (data stays),
+  or run heavy components on a second server and connect them.`,
     );
     for (const value of [...out.generated.map((k) => out.env[k]), ...Object.values(secrets)]) {
       assert.ok(!text.includes(value) && !printed.join('\n').includes(value), 'a value leaked');
