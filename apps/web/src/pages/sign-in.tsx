@@ -1,9 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { REGEXP_ONLY_DIGITS } from 'input-otp';
-import { KeyRound, Layers, MailCheck } from 'lucide-react';
+import { KeyRound, MailCheck } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { BrandMark } from '@/components/patterns/brand-mark';
 import { LegalLinks } from '@/components/patterns/legal-links';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,8 +11,8 @@ import { Input } from '@/components/ui/input';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { Label } from '@/components/ui/label';
 import { privacyChoicesLabel, showPrivacyChoices, track } from '@/lib/analytics';
-import { client, ok } from '@/lib/api';
 import { authClient } from '@/lib/auth';
+import { useAuthConfig } from '@/lib/brand';
 import { legalUrl } from '@/lib/legal';
 
 /** Centered card used by the sign-in, two-factor and invitation pages. */
@@ -20,12 +20,7 @@ export function AuthLayout(props: { title: string; description: string; children
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-sm space-y-6">
-        <div className="flex items-center justify-center gap-2 text-lg font-semibold">
-          <span className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <Layers className="size-4" />
-          </span>
-          Workspace
-        </div>
+        <BrandMark className="justify-center text-lg" />
         <Card>
           <CardHeader>
             <CardTitle className="text-xl">
@@ -103,10 +98,7 @@ export function SignInPage() {
   const [wait, setWait] = useState(0);
   const [pending, setPending] = useState(false);
   const [ref] = useState(referral);
-  const { data: config } = useQuery({
-    queryKey: ['auth-config'],
-    queryFn: () => ok(client.GET('/api/auth-config')),
-  });
+  const { data: config } = useAuthConfig();
 
   useEffect(() => {
     if (wait <= 0) return;

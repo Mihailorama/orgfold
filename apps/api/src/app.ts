@@ -219,8 +219,8 @@ export async function buildApp() {
   // Public: tells the sign-in page whether to offer "Sign in with SSO".
   app.get(
     '/api/auth-config',
-    { schema: { response: { 200: z.object({ sso: z.boolean() }) } } },
-    async () => ({ sso: ssoEnabled }),
+    { schema: { response: { 200: z.object({ sso: z.boolean(), appName: z.string() }) } } },
+    async () => ({ sso: ssoEnabled, appName: env.APP_NAME }),
   );
   authRoute('/api/auth/*', 300, ['GET', 'POST']);
   // OAuth clients (the tools, docs/sso.md) post forms to these; scoped so other routes keep theirs.
