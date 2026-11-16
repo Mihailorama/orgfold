@@ -5,6 +5,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   auditLog,
+  platformAi,
   rewardGrants,
   session,
   stackPlans,
@@ -250,6 +251,55 @@ describe('stack (docs/admin.md "Stack")', () => {
     expect(rows.map((r) => [r.action, r.actorId, r.orgId])).toEqual([
       ['operator.stack_plan.approved', op.id, null],
     ]);
+  });
+
+  it("connects the agents' model: offered pairs only, key sealed, recent sign-in, audited", async () => {
+    await db.delete(platformAi);
+    expect((await get(owner, '/api/admin/ai')).statusCode).toBe(403);
+    const first = (await get(op, '/api/admin/ai')).json() as {
+      connected: unknown;
+      options: { provider: string; kind: string; models: string[] }[];
+      logins: unknown;
+    };
+    expect(first.connected).toBeNull();
+    expect(first.logins).toBeNull(); // no llm-cli in the test env: subscriptions not available
+    const anthropic = first.options.find((o) => o.provider === 'anthropic');
+    expect(anthropic).toMatchObject({ kind: 'key' });
+    expect(first.options.find((o) => o.provider === 'codex_cli')).toMatchObject({
+      kind: 'subscription',
+      models: expect.arrayContaining(['gpt-6.1-sol']),
+    });
+    const put = (json: object) => call(op, 'PUT', '/api/admin/ai', json);
+    const model = anthropic?.models[0] ?? '';
+    expect((await put({ provider: 'anthropic', model: 'not-offered' })).statusCode).toBe(400);
+    expect((await put({ provider: 'anthropic', model })).json()).toEqual({
+      error: 'enter the API key',
+    });
+    expect((await put({ provider: 'codex_cli', model: 'gpt-6.1-sol' })).statusCode).toBe(400);
+    const signedIn = (at: Date) =>
+      db.update(session).set({ createdAt: at }).where(eq(session.userId, op.id));
+    await signedIn(new Date(Date.now() - 20 * 60_000));
+    const key = 'local-dev-anthropic-key-0123';
+    expect((await put({ provider: 'anthropic', model, apiKey: key })).statusCode).toBe(401);
+    await signedIn(new Date());
+    expect((await put({ provider: 'anthropic', model, apiKey: key })).statusCode).toBe(200);
+    const [row] = await db.select().from(platformAi);
+    expect(row).toMatchObject({ provider: 'anthropic', model, apiKeyHint: '0123' });
+    expect(row?.apiKey).toMatch(/^v1:/);
+    expect(row?.apiKey).not.toContain(key);
+    const after = (await get(op, '/api/admin/ai')).json() as { connected: object };
+    expect(after.connected).toMatchObject({ provider: 'anthropic', model, keyHint: '0123' });
+    expect(JSON.stringify(after)).not.toContain(key);
+    // same vendor again: the stored key stays
+    expect((await put({ provider: 'anthropic', model })).statusCode).toBe(200);
+    expect((await db.select().from(platformAi))[0]?.apiKey).toBe(row?.apiKey);
+    const audit = await withOperatorRead(db, (tx) =>
+      tx.select().from(auditLog).where(eq(auditLog.action, 'operator.ai.connected')),
+    );
+    expect(audit.map((r) => [r.actorId, r.target])).toContainEqual([op.id, `anthropic/${model}`]);
+    expect(JSON.stringify(audit)).not.toContain(key);
+    expect((await call(op, 'DELETE', '/api/admin/ai')).statusCode).toBe(200);
+    expect(await db.select().from(platformAi)).toEqual([]);
   });
 
   it('reads only known modes from STACK_MODES', async () => {

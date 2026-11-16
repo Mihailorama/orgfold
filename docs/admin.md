@@ -77,10 +77,21 @@ the account's role to `user`.
   the plan over SSH (`apps/api/src/stack-plan.ts` in the API container: SSH is the authorization),
   checks the same three things again (a re-run after a failed apply resumes the same plan), asks for any address or key a `connect` needs, shows the
   infrastructure plan, applies it once and marks it applied. Plans are `stack_plans` rows (not
-  tenant data). It thinks with the model chosen in `pnpm run infra` (a Claude or ChatGPT subscription, or an
-  API key; docs/setup.md); without one it answers "Agent off" and names `pnpm run infra -- add llm`.
-  Its AI calls are audited under `STACK_AI_ORG_ID`, or an "Operator console" organization the
-  worker makes on first use.
+  tenant data). It thinks with the model connected on the console's first step (below), or the one
+  `AI_STACK_PLAN_*` name; without one it answers "Agent off". Its AI calls are audited under
+  `STACK_AI_ORG_ID`, or an "Operator console" organization the worker makes on first use.
+- **Connect a model** (the console's first step, then "Model" on the Stack page): until a model is
+  connected, `/admin` opens on this step, as an agent's setup starts (`Skip for now` hides it for
+  the browser session). The operator picks how: a **ChatGPT subscription** ("Sign in with ChatGPT"
+  shows a sign-in link and a one-time code; llm-cli runs `codex login --device-auth` on the server
+  and keeps the login, refreshed tokens included), a **Claude subscription** (they run
+  `claude setup-token` on their computer and paste the token), or an **API key** (Anthropic,
+  OpenAI, Gemini, OpenRouter), then a model the contour lets plan the stack (ChatGPT defaults to
+  `gpt-6.1-sol`). Logins never leave llm-cli; a key is encrypted at once (`platform_ai`, bound to
+  `platform/default`, WEBHOOK_ENCRYPTION_KEYS) and only the worker's gateway decrypts it. Each
+  change needs a sign-in of the last 10 minutes and writes `operator.ai.connected`,
+  `operator.ai.signed_in`, `operator.ai.sign_in_started` or `operator.ai.disconnected`.
+  `pnpm run infra -- add llm` still sets a model from the terminal (non-interactive setups).
 
 Support conversations: the Chatwoot integration (docs/support.md) stores no link per user or
 organization, so the console shows none. Search Chatwoot's contacts by the user's email or id

@@ -145,6 +145,15 @@ subscription's environment (not the shim's, so `LLM_CLI_TOKEN` and other logins 
 and runs in an empty scratch directory outside that HOME. A subscription whose file is missing is skipped.
 llm-cli listens only on the internal network and requires `Authorization: Bearer $LLM_CLI_TOKEN`.
 
+**Signing in from the console.** The same bearer token guards `/logins` (docs/admin.md "Connect a
+model"; the API calls it, never the browser): `GET /logins` says which CLIs have a login,
+`PUT /logins/claude {token}` writes the `claude setup-token` token, `POST /logins/codex` runs
+`codex login --device-auth` in a throwaway HOME and returns the link and one-time code the operator
+enters (the login file is written when they finish), `DELETE /logins/<cli>` signs out. Each writes
+the file the config names for the CLI's first subscription (mode 600) and reloads the CLIs, so the
+login directory is mounted writable. After a call, a login the CLI refreshed in its HOME is written
+back (Codex rotates its refresh token; the old file would be revoked).
+
 **Concurrency and fallback.** Each subscription has its own `concurrency` (default 1). A request
 takes the next free subscription of its CLI round-robin; when all are busy it waits in a bounded
 FIFO queue (`queue.max`, `queue.timeoutMs`). A subscription that answers rate-limited cools down

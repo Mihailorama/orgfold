@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
 import { authClient } from '@/lib/auth';
 import { cn } from '@/lib/utils';
+import { ConnectModelStep, useAi } from '@/pages/admin-ai';
 
 export const PAGE = 50;
 export const dateTime = (iso: string | null) =>
@@ -155,6 +156,8 @@ export function AdminShell() {
     queryFn: () => api<{ id: string; email: string }>('/api/admin/me'),
     retry: false,
   });
+  const ai = useAi();
+  const [skipped, setSkipped] = useState(() => sessionStorage.getItem('admin-ai-skip') === '1');
 
   if (me.isPending) {
     return (
@@ -236,7 +239,17 @@ export function AdminShell() {
           <Link to="/admin/stack">Stack</Link>
         </header>
         <main className="flex-1 p-4 md:p-8">
-          <Outlet />
+          {ai.data && !ai.data.connected && !skipped ? (
+            <ConnectModelStep
+              ai={ai.data}
+              onSkip={() => {
+                sessionStorage.setItem('admin-ai-skip', '1');
+                setSkipped(true);
+              }}
+            />
+          ) : (
+            <Outlet />
+          )}
         </main>
       </div>
     </div>

@@ -39,14 +39,12 @@ Setup asks only for the base; every other component is added afterwards, one at 
 
 1. The product: its name (the app's `APP_NAME`) and a sentence or two about it, and your e-mail:
    the operator console's admin (`OPERATOR_EMAILS`, docs/admin.md).
-2. The AI the agents think with, first as in any agent's setup: a **subscription** (Claude Pro or
-   Max: `claude setup-token` opens a sign-in page and prints a token you paste; ChatGPT: Codex's
-   device-code sign-in, into a throwaway `CODEX_HOME` so your own login stays as it is) or an
-   **API key** (Anthropic, OpenAI, Gemini, OpenRouter), then the model. It runs every AI feature
-   that model is registered for (`config/ai-models.json`), the stack console's agent included.
-   A subscription runs in llm-cli, whose image holds the vendors' CLIs: the run builds it on the
-   server from `services/llm-cli` (never published, docs/llm-providers.md) and puts the login in
-   `llm-cli-secrets/` there, mode 600. Skip it and add it later with `pnpm run infra -- add llm`.
+2. Nothing about AI models: the operator console opens on "Connect a model" (docs/admin.md),
+   where you sign in to a ChatGPT or Claude subscription or enter an API key. For that, every
+   setup runs llm-cli (2 GiB), whose image holds the vendors' CLIs: the run builds it on the server
+   from `services/llm-cli` (never published, docs/llm-providers.md). `pnpm run infra -- add llm`
+   sets a model from the terminal instead (a subscription login there: `claude setup-token`, or
+   Codex's device-code sign-in into a throwaway `CODEX_HOME`).
 3. The server's address (IP, host name or an alias from `~/.ssh/config`), and the admin user.
 4. The app's address (`app.example.com` or the bare domain: the domain's owner decides), and the
    e-mail for Let's Encrypt (`internal`: Caddy's own CA, for intranets).
