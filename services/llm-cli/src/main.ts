@@ -7,7 +7,7 @@ const config = JSON.parse(
   await readFile(process.env.LLM_CLI_CONFIG ?? '/etc/llm-cli/config.json', 'utf8'),
 ) as Config;
 const clis = await load(config);
-const server = createApp(clis, { token, timeoutMs: config.timeoutMs ?? 300_000 });
+const server = createApp(clis, { token, timeoutMs: config.timeoutMs ?? 300_000, config });
 const port = Number(process.env.PORT ?? 8080);
 server.listen(port, () =>
   process.stdout.write(

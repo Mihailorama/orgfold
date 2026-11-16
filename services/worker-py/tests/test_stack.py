@@ -149,6 +149,32 @@ async def test_plan_activity_off_without_a_model(pool: asyncpg.Pool):
     plan, _ = await new_plan(pool, "We need a CRM")
     assert await acts.plan(StackPlan(plan)) == "off"
     row: Any = await pool.fetchrow("select status, reply from stack_plans where id = $1", plan)
-    assert row["status"] == "off" and "pnpm run infra -- add llm" in row["reply"]
+    assert row["status"] == "off" and "Connect a model" in row["reply"]
     await acts.failed(StackPlan(plan))  # only a drafting row changes
     assert await pool.fetchval("select status from stack_plans where id = $1", plan) == "off"
+
+
+async def test_plan_activity_uses_the_model_connected_in_the_console(pool: asyncpg.Pool, s3: S3):
+    async def provider(
+        model: str, messages: Sequence[Message], max_tokens: int, _tools: object = ()
+    ) -> Completion:
+        return Completion('{"reply": "Nothing to change.", "actions": []}', model, 10, 5)
+
+    ai = Gateway(
+        pool=pool,
+        s3=s3,
+        contour="eu",
+        registry={("fake", "m"): AllowedModel(frozenset({"stack.plan"}), None, unmetered=True)},
+        providers={"fake": provider},
+        retention_days=30,
+    )
+    acts = StackActivities(pool=pool, ai=ai, model=None, ai_org_id="", catalog=CATALOG)
+    await pool.execute("delete from platform_ai")
+    plan, _ = await new_plan(pool, "Anything to add?")
+    assert await acts.plan(StackPlan(plan)) == "off"
+    await pool.execute("insert into platform_ai (provider, model) values ('fake', 'm')")
+    try:
+        plan, _ = await new_plan(pool, "Anything to add?")
+        assert await acts.plan(StackPlan(plan)) == "ready"
+    finally:
+        await pool.execute("delete from platform_ai")

@@ -238,8 +238,8 @@ export function render(a, current = {}, { rotate = [], secrets = {}, previous } 
       else env[f.key] = v;
     }
   }
-  // The chosen model also runs the stack console's agent, when the registry allows it there, and
-  // a subscription runs in llm-cli (profile llm-cli, its image built on the server).
+  // A model set here (`add llm`, --yes) also runs the stack console's agent, when the registry
+  // allows it there. Usually the operator connects it in the console instead (docs/admin.md).
   owned.add('AI_STACK_PLAN_PROVIDER').add('AI_STACK_PLAN_MODEL');
   for (const l of Object.values(LOGINS)) owned.add(l.key);
   const llm = a.components?.llm ?? {};
@@ -252,14 +252,16 @@ export function render(a, current = {}, { rotate = [], secrets = {}, previous } 
       env.AI_STACK_PLAN_PROVIDER = provider;
       env.AI_STACK_PLAN_MODEL = model;
     }
-    if (subscription(a)) {
-      profiles.push('llm-cli');
-      generated.push('LLM_CLI_TOKEN');
-      const keep = current.LLM_CLI_TOKEN && !rotate.includes('LLM_CLI_TOKEN');
-      env.LLM_CLI_TOKEN = keep ? current.LLM_CLI_TOKEN : randomBytes(32).toString('hex');
-      env.IMAGE_LLM_CLI = llmCliTag(a.project);
-    }
   }
+  // llm-cli always runs: the console's first step signs in to a Claude or ChatGPT subscription
+  // there (its image holds vendor CLIs, so it is built on the server, never published).
+  profiles.push('llm-cli');
+  generated.push('LLM_CLI_TOKEN');
+  const keepToken = current.LLM_CLI_TOKEN && !rotate.includes('LLM_CLI_TOKEN');
+  env.LLM_CLI_TOKEN = keepToken ? current.LLM_CLI_TOKEN : randomBytes(32).toString('hex');
+  env.IMAGE_LLM_CLI = llmCliTag(a.project);
+  // The worker refuses every model without a contour; the console's choice needs one too.
+  env.AI_CONTOUR ||= Object.keys(models.contours)[0];
   // The operator console's admins (docs/admin.md), asked at setup.
   if (a.operators) {
     owned.add('OPERATOR_EMAILS');
@@ -306,13 +308,9 @@ export function freshEnvError({ envExists, savedAnswers, serverHasEnv, envFile }
   vault item, then run again.`;
 }
 
-/** A subscription model runs in llm-cli on the server. */
-const subscription = (a) =>
-  modeOf(a, byId.llm) === 'connect' &&
-  models.providers[a.components?.llm?.AI_PROJECT_SUMMARY_PROVIDER]?.kind === 'cli';
 const ramOf = (a) =>
   catalog.reduce((sum, c) => sum + (modeOf(a, c) === 'install' ? (c.install?.ramMiB ?? 0) : 0), 0) +
-  (subscription(a) ? byId['llm-cli'].install.ramMiB : 0);
+  byId['llm-cli'].install.ramMiB; // always on: subscription sign-ins (render)
 
 /** The plan: profiles and env KEY NAMES added (+), changed (~), removed (-), and RAM. */
 export function plan({ a, current, next, generated, missing = [], serverMiB, release }) {
@@ -681,8 +679,6 @@ async function ask(a, current, secrets, only, fixed) {
       a.operators ?? current.OPERATOR_EMAILS ?? '',
       '^[^@\\s,]+@[^@\\s,]+(,[^@\\s,]+@[^@\\s,]+)*$',
     );
-    // The AI the agents think with comes first, as in any agent's setup (subscription or key).
-    await component(byId.llm);
   }
   if (only) await component(byId[only]);
   else if (fixed) for (const id of Object.keys(fixed)) await component(byId[id]);

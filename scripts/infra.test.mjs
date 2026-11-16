@@ -97,7 +97,7 @@ test('render: secrets generated once, kept, rotated on request; derived values f
   const first = render(answers(), {}, { secrets });
   const { env } = first;
   assert.deepEqual(first.missing, []);
-  assert.equal(env.COMPOSE_PROFILES, 'db,s3');
+  assert.equal(env.COMPOSE_PROFILES, 'db,s3,llm-cli');
   // the console's stack page reads how each component runs; every available one is listed
   assert.match(
     env.STACK_MODES,
@@ -151,7 +151,7 @@ test('plan (dry run): key names only, no value, exact text', () => {
   components: core install, postgres install, s3 install, smtp connect, analytics install, llm connect, vault install, crm skip
   profiles: + analytics, + vault
   env keys: ~ S3_ACCESS_KEY_ID (generated), + UMAMI_PUBLIC_URL, + UMAMI_DB_PASSWORD (generated), + UMAMI_APP_SECRET (generated), + UMAMI_ADMIN_PASSWORD (generated), + ANALYTICS_ORIGINS, + VAULT_PUBLIC_URL, + VAULT_DB_PASSWORD (generated), + VAULT_DATABASE_URL, + SSO_VAULTWARDEN_SECRET (generated), + SSO_VAULTWARDEN_REDIRECT_URIS, ~ STACK_MODES, - POSTHOG_HOST, - POSTHOG_KEY
-  RAM budget (mem_limit): 3.5 GiB of 3.8 GiB on the server
+  RAM budget (mem_limit): 5.5 GiB of 3.8 GiB on the server
   WARNING: that is more than 90 % of it`,
     );
     for (const value of [...out.generated.map((k) => out.env[k]), ...Object.values(secrets)]) {
@@ -189,12 +189,13 @@ test('@apiKey follows the env names of config/ai-models.json', () => {
     assert.ok(config.includes(file), file);
 });
 
-test('the chosen model runs the stack agent too; a subscription runs in llm-cli', () => {
+test('llm-cli always runs for the console sign-ins; a model set here runs the stack agent', () => {
   const env = render(answers(), {}, { secrets }).env;
   assert.equal(env.AI_STACK_PLAN_PROVIDER, 'anthropic');
   assert.equal(env.AI_STACK_PLAN_MODEL, 'claude-haiku-5-5');
-  assert.ok(!env.COMPOSE_PROFILES.split(',').includes('llm-cli'));
-  assert.equal(env.LLM_CLI_TOKEN, undefined);
+  assert.ok(env.COMPOSE_PROFILES.split(',').includes('llm-cli'));
+  assert.match(env.IMAGE_LLM_CLI, /^app-llm-cli:[0-9a-f]{12}$/);
+  assert.match(env.LLM_CLI_TOKEN, /^[0-9a-f]{64}$/);
 
   const a = answers();
   a.components.llm.AI_PROJECT_SUMMARY_PROVIDER = 'claude_cli';
@@ -202,22 +203,18 @@ test('the chosen model runs the stack agent too; a subscription runs in llm-cli'
   assert.deepEqual(validateAnswers(a), []);
   const sub = render(a, {}, { secrets: { ...secrets, LLM_CLI_CLAUDE_TOKEN: 'local-dev-token' } });
   assert.deepEqual(sub.missing, []);
-  assert.ok(sub.env.COMPOSE_PROFILES.split(',').includes('llm-cli'));
   assert.equal(sub.env.AI_STACK_PLAN_PROVIDER, 'claude_cli');
   assert.equal(sub.env.LLM_CLI_CLAUDE_TOKEN, 'local-dev-token');
-  assert.match(sub.env.IMAGE_LLM_CLI, /^app-llm-cli:[0-9a-f]{12}$/);
-  assert.match(sub.env.LLM_CLI_TOKEN, /^[0-9a-f]{64}$/);
   assert.equal(sub.env.OPERATOR_EMAILS, 'ops@example.com');
-  const ram = (x) => /RAM budget \(mem_limit\): ([\d.]+) GiB/.exec(plan(x))[1];
-  const planOf = (x, env) => ({ a: x, current: {}, next: env, generated: [] });
-  assert.equal((ram(planOf(a, sub.env)) - ram(planOf(answers(), env))).toFixed(1), '2.0');
-  // kept on a re-run; gone with the model
+  // kept on a re-run; without a model here only the CLI's login and the agent's model go
   assert.equal(render(a, sub.env, {}).env.LLM_CLI_TOKEN, sub.env.LLM_CLI_TOKEN);
   a.components.llm = { mode: 'skip' };
   const off = render(a, sub.env, {}).env;
-  for (const k of ['LLM_CLI_TOKEN', 'IMAGE_LLM_CLI', 'LLM_CLI_CLAUDE_TOKEN', 'AI_STACK_PLAN_MODEL'])
+  for (const k of ['LLM_CLI_CLAUDE_TOKEN', 'AI_STACK_PLAN_MODEL', 'AI_PROJECT_SUMMARY_MODEL'])
     assert.equal(off[k], undefined, k);
-  assert.ok(!off.COMPOSE_PROFILES.split(',').includes('llm-cli'));
+  assert.equal(off.LLM_CLI_TOKEN, sub.env.LLM_CLI_TOKEN);
+  assert.ok(off.COMPOSE_PROFILES.split(',').includes('llm-cli'));
+  assert.equal(off.AI_CONTOUR, 'eu'); // the console's model needs a contour
   assert.deepEqual(validateAnswers({ ...a, operators: 'not-an-email' }), [
     'operators: e-mail addresses, comma-separated',
   ]);

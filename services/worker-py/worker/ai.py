@@ -278,7 +278,8 @@ class Gateway:
             return await self._call(own, *args)
         tried: set[tuple[str, str]] = set()
         while True:
-            allowed, route = self._route(purpose, provider, model)
+            platform = None if self._configured(provider) else await self._platform_call(provider)
+            allowed, route = self._route(purpose, provider, model, platform)
             if self.plans is not None:
                 if route.price is not None:
                     await check_llm_budget(self.pool, self.plans, org_id, route.price.currency)
@@ -306,14 +307,16 @@ class Gateway:
                 )
                 provider, model = fb.provider, fb.model
 
-    def _route(self, purpose: str, provider: str, model: str) -> tuple[AllowedModel, _Route]:
+    def _route(
+        self, purpose: str, provider: str, model: str, platform: Provider | None = None
+    ) -> tuple[AllowedModel, _Route]:
         allowed = self.registry.get((provider, model))
-        call = self.providers.get(provider)
+        call = platform or self.providers.get(provider)
         if allowed is None or purpose not in allowed.purposes or call is None:
             raise ModelNotAllowed(
                 f"{provider}/{model} is not allowed for {purpose!r} in contour {self.contour!r}"
             )
-        if not self._configured(provider):
+        if platform is None and not self._configured(provider):
             # No base URL/key: LiteLLM would fall back to the environment or a vendor default.
             raise ModelNotAllowed(
                 f"provider {provider!r} is not configured (docs/llm-providers.md)"
@@ -326,6 +329,20 @@ class Gateway:
                 ' pricePer1kTokens or mark it "unmetered": true'
             )
         return allowed, _Route(provider, model, call, None if allowed.unmetered else price)
+
+    async def _platform_call(self, provider: str) -> Provider | None:
+        """The API key an operator connected in the console (platform_ai, docs/admin.md "Connect
+        a model") when it is for this provider; the registry still decides what it may serve."""
+        template = self.configs.get(provider)
+        if self.byo is None or template is None or template.kind not in ("api", "aggregator"):
+            return None
+        row = await self.pool.fetchrow(
+            "select api_key from platform_ai where id = 'default' and provider = $1", provider
+        )
+        if row is None or not row["api_key"]:
+            return None
+        key = decrypt_secret(row["api_key"], "platform/default", self.byo.keys)
+        return await byo_provider(template, base_url=None, api_key=key, allowed=[])
 
     def _configured(self, provider: str) -> bool:
         cfg = self.configs.get(provider)

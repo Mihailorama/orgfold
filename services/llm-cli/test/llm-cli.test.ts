@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -348,6 +349,79 @@ describe('HTTP shim', () => {
       assert.equal((await res.json()).error.type, 'rate_limit_error');
     } finally {
       all.app.close();
+    }
+  });
+
+  it('signs in from the console: a Claude token, a ChatGPT device code; status and sign-out', async () => {
+    const secrets = await dir();
+    const claudeFile = join(secrets, 'claude-1.token');
+    const codexFile = join(secrets, 'codex-1.auth.json');
+    const config: Config = {
+      clis: {
+        claude: {
+          bin: FAKE,
+          subscriptions: [{ name: 'claude-1', env: { CLAUDE_CODE_OAUTH_TOKEN: claudeFile } }],
+        },
+        codex: {
+          bin: FAKE,
+          subscriptions: [
+            {
+              name: 'codex-1',
+              env: { FAKE_AS: join(secrets, 'as-codex') },
+              files: { '.codex/auth.json': codexFile },
+            },
+          ],
+        },
+      },
+    };
+    await writeFile(join(secrets, 'as-codex'), 'codex');
+    const app = createApp(await load(config), { token: TOKEN, timeoutMs: 10_000, config });
+    await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
+    const base = `http://127.0.0.1:${(app.address() as AddressInfo).port}`;
+    const call = (method: string, path: string, body?: unknown, token = TOKEN) =>
+      fetch(`${base}${path}`, {
+        method,
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+    try {
+      assert.equal((await call('GET', '/logins', undefined, 'wrong')).status, 401);
+      assert.deepEqual(await (await call('GET', '/logins')).json(), {
+        claude: false,
+        codex: false,
+        device: null,
+      });
+      assert.equal((await call('PUT', '/logins/claude', { token: 'x y' })).status, 400);
+      const token = 'sk-ant-oat01-local-dev-token-0123456789';
+      assert.equal((await call('PUT', '/logins/claude', { token })).status, 200);
+      assert.equal(await readFile(claudeFile, 'utf8'), token);
+      assert.equal((await stat(claudeFile)).mode & 0o777, 0o600);
+
+      const started = await (await call('POST', '/logins/codex')).json();
+      assert.deepEqual(started, {
+        state: 'pending',
+        url: 'https://auth.openai.com/codex/device',
+        code: 'ABCD-12345',
+      });
+      let status = await (await call('GET', '/logins')).json();
+      for (let i = 0; i < 50 && status.device.state === 'pending'; i++) {
+        await new Promise((r) => setTimeout(r, 50));
+        status = await (await call('GET', '/logins')).json();
+      }
+      assert.deepEqual([status.claude, status.codex, status.device.state], [true, true, 'done']);
+      // the new logins are served without a restart
+      const res = await call('POST', '/codex/v1/chat/completions', {
+        model: 'gpt-6.1-sol',
+        messages: MESSAGES,
+      });
+      assert.equal(res.status, 200);
+      // the refreshed login is kept for the next start
+      assert.equal(await readFile(codexFile, 'utf8'), '{"tokens":"refreshed"}');
+
+      assert.equal((await call('DELETE', '/logins/claude')).status, 200);
+      assert.equal(existsSync(claudeFile), false);
+    } finally {
+      app.close();
     }
   });
 });

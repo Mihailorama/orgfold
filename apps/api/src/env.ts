@@ -116,6 +116,9 @@ const schema = z
     BILLING_CONTOUR: z.string().default('en'),
     /** Contour of config/ai-models.json: which cost currencies the billing page shows. */
     AI_CONTOUR: z.string().default(''),
+    /** llm-cli (subscriptions): the console signs in to Claude/ChatGPT there (admin-ai.ts). */
+    LLM_CLI_URL: z.union([z.url(), z.literal('')]).optional(),
+    LLM_CLI_TOKEN: z.string().optional(),
     STRIPE_SECRET_KEY: z.string().optional(),
     STRIPE_WEBHOOK_SECRET: z.string().optional(),
     /** Only for stripe-mock in tests/dev, e.g. http://localhost:12111; empty = api.stripe.com. */

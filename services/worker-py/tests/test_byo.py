@@ -207,3 +207,52 @@ async def test_flag_off_keeps_the_operator_models(
     assert mock.posts() == []
     monkeypatch.setattr(settings, "FLAGS_ON", frozenset({"byo-llm-providers"}))
     assert (await summarize(gateway, org)).text == "Hello."
+
+
+async def test_console_key_serves_the_platform_model(
+    pool: asyncpg.Pool, s3: S3, mock: Mock
+) -> None:
+    """An API key connected in the operator console (platform_ai) calls its vendor when the env
+    has none; without it the provider is not configured and the call is refused."""
+    from dataclasses import replace
+
+    from worker.ai import ModelNotAllowed
+
+    gateway = make_gateway(
+        pool, s3, {("openai", "gpt-x"): AllowedModel(frozenset({"stack.plan"}), None, True)}
+    )
+    gateway.configs = {
+        **gateway.configs,
+        "openai": replace(gateway.configs["openai"], base_url=f"{mock.url}/v1"),
+    }
+    org = await new_org(pool)
+    await pro(pool, org)
+
+    async def plan() -> Any:
+        return await gateway.call_llm(
+            "stack.plan",
+            [Message("user", "We need a CRM")],
+            model="gpt-x",
+            provider="openai",
+            org_id=org,
+            actor_id=None,
+            prompt_template_id="t",
+            prompt_template_version="1",
+            max_tokens=16,
+        )
+
+    await pool.execute("delete from platform_ai")
+    with pytest.raises(ModelNotAllowed):
+        await plan()
+    sealed = encrypt_secret("local-dev-console-key", "platform/default", KEY_ID, KEY)
+    await pool.execute(
+        "insert into platform_ai (provider, model, api_key) values ('openai', 'gpt-x', $1)", sealed
+    )
+    try:
+        mock.seen.clear()
+        assert (await plan()).text == "Hello."
+        [sent] = mock.posts()
+        assert sent["headers"]["authorization"] == "Bearer local-dev-console-key"
+        assert sent["body"]["model"] == "gpt-x"
+    finally:
+        await pool.execute("delete from platform_ai")

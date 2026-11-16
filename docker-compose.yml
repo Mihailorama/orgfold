@@ -337,7 +337,7 @@ services:
       LLM_CLI_TOKEN: ${LLM_CLI_TOKEN:-local-dev-llm-cli-token-change-me-0123456789}
     volumes:
       - ./infra/llm-cli/config.json:/etc/llm-cli/config.json:ro
-      - ./.secrets/llm-cli:/run/secrets/llm-cli:ro
+      - ./.secrets/llm-cli:/run/secrets/llm-cli
     read_only: true
     tmpfs: [/tmp]
 

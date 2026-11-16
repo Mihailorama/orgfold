@@ -15,6 +15,9 @@ export type Subscription = {
   concurrency: number;
   env: Record<string, string>;
   home: string;
+  /** Login files copied into HOME (path under HOME -> source), written back when a CLI
+   * refreshes them (Codex rotates its refresh token). */
+  files?: Record<string, string>;
 };
 
 export type Limits = { maxQueue: number; queueTimeoutMs: number; cooldownMs: number };

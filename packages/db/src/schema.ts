@@ -521,3 +521,22 @@ export const stackPlans = pgTable(
     ),
   ],
 );
+
+/**
+ * The model the platform's own agents think with (the stack console's agent, and AI features with
+ * no model of their own), connected by an operator in the console (docs/admin.md "Connect a
+ * model"). One row, id 'default'. `provider`/`model` are a pair of config/ai-models.json; an API
+ * key is stored encrypted like BYO keys (`v1:<key id>:<iv>:<data>`, WEBHOOK_ENCRYPTION_KEYS, bound
+ * to `platform/default`) and only the worker's gateway decrypts it. A subscription's login lives in
+ * llm-cli, never here. Not tenant data.
+ */
+export const platformAi = pgTable('platform_ai', {
+  id: text('id').primaryKey().default('default'),
+  provider: text('provider').notNull(),
+  model: text('model').notNull(),
+  apiKey: text('api_key'),
+  /** Last 4 characters of the key, to recognise it in the console. */
+  apiKeyHint: text('api_key_hint'),
+  connectedBy: text('connected_by').references(() => user.id, { onDelete: 'set null' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

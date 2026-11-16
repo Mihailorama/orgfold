@@ -107,6 +107,9 @@ services:
       - APP_NAME
       # operator console, Stack page: modes, sender, and the install.site key of each on-box tool
       - STACK_MODES
+      # "Connect a model": subscription sign-ins run in llm-cli (docs/admin.md)
+      - LLM_CLI_URL=${LLM_CLI_URL:-http://llm-cli:8080}
+      - LLM_CLI_TOKEN
       - MAIL_FROM
       - CRM_PUBLIC_URL
       - UMAMI_PUBLIC_URL
@@ -307,7 +310,7 @@ services:
       - LLM_CLI_TOKEN
       - LLM_CLI_CONFIG=${LLM_CLI_CONFIG:-/etc/llm-cli/config.json}
     volumes:
-      - ${LLM_CLI_SECRETS_DIR:-./llm-cli-secrets}:/run/secrets/llm-cli:ro
+      - ${LLM_CLI_SECRETS_DIR:-./llm-cli-secrets}:/run/secrets/llm-cli
 
   web:
     image: ${IMAGE_WEB:?no release, deploy with scripts/deploy.mjs}
