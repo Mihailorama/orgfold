@@ -26,7 +26,8 @@ alone.
 ## Bootstrap
 
 1. The person signs up like any user and confirms the email address.
-2. Add the address to `OPERATOR_EMAILS` in the deployment's env file (`deploy/env/<env>.enc.env`,
+2. `pnpm run infra` asks for it at setup (`operators` in the answers file). Otherwise add the
+   address to `OPERATOR_EMAILS` in the deployment's env file (`deploy/env/<env>.enc.env`,
    docs/deploy.md) and deploy, or set it in `.env` locally.
 3. They turn on TOTP under Settings -> Security and open `/admin` (also in the user menu).
 
@@ -76,8 +77,10 @@ the account's role to `user`.
   the plan over SSH (`apps/api/src/stack-plan.ts` in the API container: SSH is the authorization),
   checks the same three things again (a re-run after a failed apply resumes the same plan), asks for any address or key a `connect` needs, shows the
   infrastructure plan, applies it once and marks it applied. Plans are `stack_plans` rows (not
-  tenant data). Off until `AI_STACK_PLAN_PROVIDER`, `AI_STACK_PLAN_MODEL` and `STACK_AI_ORG_ID`
-  (the operator's own organization, for the AI audit rows) are set on the worker.
+  tenant data). It thinks with the model chosen in `pnpm run infra` (a Claude or ChatGPT subscription, or an
+  API key; docs/setup.md); without one it answers "Agent off" and names `pnpm run infra -- add llm`.
+  Its AI calls are audited under `STACK_AI_ORG_ID`, or an "Operator console" organization the
+  worker makes on first use.
 
 Support conversations: the Chatwoot integration (docs/support.md) stores no link per user or
 organization, so the console shows none. Search Chatwoot's contacts by the user's email or id

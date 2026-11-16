@@ -22,6 +22,8 @@ from worker.ai import Gateway, Message, ModelNotAllowed
 from worker.tracker import obj
 
 PURPOSE = "stack.plan"
+# Without STACK_AI_ORG_ID the agent's calls are audited under this organization, made on first use.
+CONSOLE_ORG = ("operator-console", "Operator console")
 # prompts/stack.plan/system.v1.md. New prompt text = new file + bump the version here.
 PLAN_PROMPT = ("stack.plan/system", 1)
 MODES = ("install", "connect", "skip")
@@ -116,10 +118,12 @@ class StackActivities:
         )
         if row is None or row["status"] != "drafting":
             return row["status"] if row else "missing"
-        if self.ai is None or self.model is None or not self.ai_org_id:
-            how = "set AI_STACK_PLAN_PROVIDER, AI_STACK_PLAN_MODEL and STACK_AI_ORG_ID"
+        if self.ai is None or self.model is None:
+            how = "connect a model with pnpm run infra -- add llm"
             await self._finish(p, "off", f"The planning agent is off: {how}.", [], None)
             return "off"
+        if not self.ai_org_id:
+            self.ai_org_id = await self._console_org()
         modes = parse_modes(row["stack_version"])
         try:
             result = await self._call(row, modes)
@@ -154,6 +158,17 @@ class StackActivities:
             prompt_template_version=prompt.version,
             max_tokens=1500,
         )
+
+    async def _console_org(self) -> str:
+        """The organization the agent's calls are billed and audited under, when none is set."""
+        slug, name = CONSOLE_ORG
+        await self.pool.execute(
+            "insert into organization (id, name, slug, created_at) values ($1, $2, $1, now())"
+            " on conflict do nothing",
+            slug,
+            name,
+        )
+        return str(await self.pool.fetchval("select id from organization where slug = $1", slug))
 
     @activity.defn(name="stack_plan_failed")
     async def failed(self, p: StackPlan) -> None:

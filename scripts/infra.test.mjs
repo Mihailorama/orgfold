@@ -168,9 +168,55 @@ test('@apiKey follows the env names of config/ai-models.json', () => {
   );
   const f = { key: '@apiKey', prompt: 'key', secret: true };
   for (const [id, p] of Object.entries(providers)) {
+    if (p.kind === 'cli') continue;
     const keys = expandField(f, { AI_PROJECT_SUMMARY_PROVIDER: id }).map((x) => x.key);
     assert.deepEqual(keys, [p.baseUrlEnv, p.apiKeyEnv].filter(Boolean), id);
   }
+  // A subscription asks for its login instead; llm-cli reads it from the file in its config.
+  const login = (id) => expandField(f, { AI_PROJECT_SUMMARY_PROVIDER: id });
+  assert.deepEqual(
+    login('claude_cli').map((x) => [x.key, x.secret, x.login]),
+    [['LLM_CLI_CLAUDE_TOKEN', true, 'claude']],
+  );
+  assert.deepEqual(
+    login('codex_cli').map((x) => x.key),
+    ['LLM_CLI_CODEX_AUTH'],
+  );
+  assert.deepEqual(login('gemini_cli'), []);
+  const config = readFileSync(new URL('../infra/llm-cli/config.json', import.meta.url), 'utf8');
+  for (const file of ['claude-1.token', 'codex-1.auth.json'])
+    assert.ok(config.includes(file), file);
+});
+
+test('the chosen model runs the stack agent too; a subscription runs in llm-cli', () => {
+  const env = render(answers(), {}, { secrets }).env;
+  assert.equal(env.AI_STACK_PLAN_PROVIDER, 'anthropic');
+  assert.equal(env.AI_STACK_PLAN_MODEL, 'claude-haiku-5-5');
+  assert.ok(!env.COMPOSE_PROFILES.split(',').includes('llm-cli'));
+  assert.equal(env.LLM_CLI_TOKEN, undefined);
+
+  const a = answers();
+  a.components.llm.AI_PROJECT_SUMMARY_PROVIDER = 'claude_cli';
+  a.operators = 'ops@example.com';
+  assert.deepEqual(validateAnswers(a), []);
+  const sub = render(a, {}, { secrets: { ...secrets, LLM_CLI_CLAUDE_TOKEN: 'local-dev-token' } });
+  assert.deepEqual(sub.missing, []);
+  assert.ok(sub.env.COMPOSE_PROFILES.split(',').includes('llm-cli'));
+  assert.equal(sub.env.AI_STACK_PLAN_PROVIDER, 'claude_cli');
+  assert.equal(sub.env.LLM_CLI_CLAUDE_TOKEN, 'local-dev-token');
+  assert.match(sub.env.IMAGE_LLM_CLI, /^app-llm-cli:[0-9a-f]{12}$/);
+  assert.match(sub.env.LLM_CLI_TOKEN, /^[0-9a-f]{64}$/);
+  assert.equal(sub.env.OPERATOR_EMAILS, 'ops@example.com');
+  // kept on a re-run; gone with the model
+  assert.equal(render(a, sub.env, {}).env.LLM_CLI_TOKEN, sub.env.LLM_CLI_TOKEN);
+  a.components.llm = { mode: 'skip' };
+  const off = render(a, sub.env, {}).env;
+  for (const k of ['LLM_CLI_TOKEN', 'IMAGE_LLM_CLI', 'LLM_CLI_CLAUDE_TOKEN', 'AI_STACK_PLAN_MODEL'])
+    assert.equal(off[k], undefined, k);
+  assert.ok(!off.COMPOSE_PROFILES.split(',').includes('llm-cli'));
+  assert.deepEqual(validateAnswers({ ...a, operators: 'not-an-email' }), [
+    'operators: e-mail addresses, comma-separated',
+  ]);
 });
 
 test("bootstrap keeps every SSH port open: the client's, sshd -T, ListenAddress, ssh.socket", () => {
