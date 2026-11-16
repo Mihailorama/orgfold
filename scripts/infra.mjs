@@ -252,7 +252,7 @@ export function render(a, current = {}, { rotate = [], secrets = {}, previous } 
       env.AI_STACK_PLAN_PROVIDER = provider;
       env.AI_STACK_PLAN_MODEL = model;
     }
-    if (models.providers[provider]?.kind === 'cli') {
+    if (subscription(a)) {
       profiles.push('llm-cli');
       generated.push('LLM_CLI_TOKEN');
       const keep = current.LLM_CLI_TOKEN && !rotate.includes('LLM_CLI_TOKEN');
@@ -306,8 +306,13 @@ export function freshEnvError({ envExists, savedAnswers, serverHasEnv, envFile }
   vault item, then run again.`;
 }
 
+/** A subscription model runs in llm-cli on the server. */
+const subscription = (a) =>
+  modeOf(a, byId.llm) === 'connect' &&
+  models.providers[a.components?.llm?.AI_PROJECT_SUMMARY_PROVIDER]?.kind === 'cli';
 const ramOf = (a) =>
-  catalog.reduce((sum, c) => sum + (modeOf(a, c) === 'install' ? (c.install?.ramMiB ?? 0) : 0), 0);
+  catalog.reduce((sum, c) => sum + (modeOf(a, c) === 'install' ? (c.install?.ramMiB ?? 0) : 0), 0) +
+  (subscription(a) ? byId['llm-cli'].install.ramMiB : 0);
 
 /** The plan: profiles and env KEY NAMES added (+), changed (~), removed (-), and RAM. */
 export function plan({ a, current, next, generated, missing = [], serverMiB, release }) {

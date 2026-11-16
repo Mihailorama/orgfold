@@ -207,6 +207,9 @@ test('the chosen model runs the stack agent too; a subscription runs in llm-cli'
   assert.match(sub.env.IMAGE_LLM_CLI, /^app-llm-cli:[0-9a-f]{12}$/);
   assert.match(sub.env.LLM_CLI_TOKEN, /^[0-9a-f]{64}$/);
   assert.equal(sub.env.OPERATOR_EMAILS, 'ops@example.com');
+  const ram = (x) => /RAM budget \(mem_limit\): ([\d.]+) GiB/.exec(plan(x))[1];
+  const planOf = (x, env) => ({ a: x, current: {}, next: env, generated: [] });
+  assert.equal((ram(planOf(a, sub.env)) - ram(planOf(answers(), env))).toFixed(1), '2.0');
   // kept on a re-run; gone with the model
   assert.equal(render(a, sub.env, {}).env.LLM_CLI_TOKEN, sub.env.LLM_CLI_TOKEN);
   a.components.llm = { mode: 'skip' };
