@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/Mihailorama/saas-agent-starter/compare/v0.1.0...v0.2.0) (2026-11-16)
+
+
+### Features
+
+* plan a stack change with an agent in the console, approve it, apply it from your machine ([#108](https://github.com/Mihailorama/saas-agent-starter/issues/108)) ([8b6a8ac](https://github.com/Mihailorama/saas-agent-starter/commit/8b6a8ac51c87fde8451f6ab716c179ae52a826af))
+
 ## 0.1.0 (2026-11-15)
 
 
