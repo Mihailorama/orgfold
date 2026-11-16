@@ -111,6 +111,7 @@ Generated values (database passwords, `BETTER_AUTH_SECRET`, S3 keys) stay unless
 ```sh
 pnpm run infra -- --rotate BETTER_AUTH_SECRET      # a new value; signs everyone out
 pnpm run infra -- add analytics                    # answer for one component, then apply
+pnpm run infra -- apply <plan id>                  # a plan approved on the Stack page (docs/admin.md)
 pnpm run infra -- plan                             # what a run would change; touches nothing
 ```
 

@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import { checkComponents } from './check-components.mjs';
 import {
   catalog,
+  checkPlan,
   command,
   expandField,
   freshEnvError,
@@ -219,23 +220,54 @@ test('--rotate only what the server re-applies', () => {
 });
 
 test('the subcommand counts wherever it stands: a misplaced plan stays a dry run', () => {
-  assert.deepEqual(command(['staging', 'plan']), {
-    cmd: 'plan',
-    only: undefined,
-    words: ['staging'],
-  });
-  assert.deepEqual(command(['plan', 'staging']), {
-    cmd: 'plan',
-    only: undefined,
-    words: ['staging'],
-  });
+  const none = { only: undefined, planId: undefined };
+  assert.deepEqual(command(['staging', 'plan']), { cmd: 'plan', ...none, words: ['staging'] });
+  assert.deepEqual(command(['plan', 'staging']), { cmd: 'plan', ...none, words: ['staging'] });
   assert.deepEqual(command(['staging', 'add', 'vault']), {
     cmd: 'add',
     only: 'vault',
+    planId: undefined,
     words: ['staging'],
   });
-  assert.deepEqual(command(['add', 'vault']), { cmd: 'add', only: 'vault', words: [] });
-  assert.deepEqual(command(['staging']), { cmd: 'setup', only: undefined, words: ['staging'] });
+  assert.deepEqual(command(['add', 'vault']), {
+    cmd: 'add',
+    only: 'vault',
+    planId: undefined,
+    words: [],
+  });
+  assert.deepEqual(command(['apply', 'p1', 'staging']), {
+    cmd: 'apply',
+    only: undefined,
+    planId: 'p1',
+    words: ['staging'],
+  });
+  assert.deepEqual(command(['staging']), { cmd: 'setup', ...none, words: ['staging'] });
+});
+
+test('a plan from the Stack page runs only approved, for the same stack, catalog actions', () => {
+  const modes = 'core:install,crm:skip';
+  const plan = (o) => ({
+    status: 'approved',
+    stackVersion: modes,
+    actions: [{ component: 'crm', mode: 'install' }],
+    ...o,
+  });
+  assert.deepEqual(checkPlan(plan(), modes), { crm: 'install' });
+  assert.match(checkPlan(plan({ status: 'ready' }), modes), /approve it on the Stack page/);
+  assert.match(checkPlan(plan({ status: 'applied' }), modes), /ran already/);
+  assert.match(checkPlan(plan(), 'core:install,crm:connect'), /stack changed/);
+  // An apply that failed after writing the env: the same plan resumes.
+  assert.deepEqual(checkPlan(plan(), 'crm:install,core:install'), { crm: 'install' });
+  for (const action of [
+    { component: 'core', mode: 'skip' },
+    { component: 'postgres', mode: 'connect' }, // the base changes only through infra itself
+    { component: 'langfuse', mode: 'install' }, // not available yet
+    { component: 'smtp', mode: 'skip' }, // not one of its modes
+    { component: 'nope', mode: 'install' },
+  ]) {
+    assert.match(checkPlan(plan({ actions: [action] }), modes), /outside the catalog/);
+  }
+  assert.match(checkPlan(plan({ actions: [] }), modes), /no actions/);
 });
 
 test('the receipt lists what is installed with addresses, then connected and skipped', () => {

@@ -62,6 +62,11 @@ export const supportTriageWorkflowId = (c: SupportConversation) =>
 export const startSupportTriage = (c: SupportConversation) =>
   startOnce('SupportTriageWorkflow', supportTriageWorkflowId(c), c);
 
+/** Stack console (docs/admin.md "Plan a change"). Id only: the worker reads the request from the row. */
+export type StackPlan = { planId: string };
+export const startStackPlan = (p: StackPlan) =>
+  startOnce('StackPlanWorkflow', `stack-plan-${p.planId}`, p);
+
 /** A tracker item linked to conversations was closed; `closeId` makes each close event unique. */
 export type SupportIssueClosed = {
   tracker: 'github' | 'plane';

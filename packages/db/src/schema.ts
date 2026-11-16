@@ -486,3 +486,38 @@ export const telegramSupportLinks = pgTable('telegram_support_links', {
   signature: text('signature').primaryKey(),
   usedAt: timestamp('used_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Stack console plans (docs/admin.md "Plan a change"): an operator's request, the agent's plan
+ * made only of catalog actions (config/components.json), and its approval. Not tenant-scoped:
+ * the stack is the operator's. A plan is bound to the stack it was made for (`stackVersion`,
+ * a hash of STACK_MODES); `pnpm run infra -- apply <id>` reads it over SSH and marks it applied.
+ */
+export const stackPlans = pgTable(
+  'stack_plans',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    request: text('request').notNull(),
+    /** drafting -> ready | failed | off; ready -> approved -> applied. */
+    status: text('status').notNull().default('drafting'),
+    /** The agent's answer to the operator, shown above the actions. */
+    reply: text('reply'),
+    /** [{ component, mode }] with mode install | connect | skip, checked against the catalog. */
+    actions: jsonb('actions').$type<{ component: string; mode: string }[]>(),
+    stackVersion: text('stack_version').notNull(),
+    aiCallId: uuid('ai_call_id').references(() => aiCalls.id, { onDelete: 'set null' }),
+    /** Kept when the operator's account is deleted: the plan stays in the record. */
+    createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
+    approvedBy: text('approved_by').references(() => user.id, { onDelete: 'set null' }),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    appliedAt: timestamp('applied_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index().on(t.createdAt),
+    check(
+      'stack_plans_status',
+      sql`${t.status} in ('drafting','ready','failed','off','approved','applied')`,
+    ),
+  ],
+);

@@ -19,6 +19,13 @@
       "oversight": "The model only writes internal notes for the support team. A person reads every request and decides what to answer; the model never replies to you on its own."
     },
     {
+      "purpose": "stack.plan",
+      "title": "Planning changes to our own systems",
+      "what": "Our administrators can ask a language model to plan a change to the software we run the service on (for example adding a tool). It proposes a plan; an administrator approves it after signing in again, and only then is it carried out.",
+      "data": "The administrator's request and the list of our components. No customer data is sent.",
+      "oversight": "Nothing changes until an administrator approves the plan, and it is carried out exactly as approved."
+    },
+    {
       "purpose": "judge",
       "title": "Quality checks of AI output",
       "what": "We check the quality of AI output: before a change ships, against a fixed set of made-up examples, and, if enabled, by letting a second language model grade a small sample of recent outputs against fixed, versioned criteria in our quality tool. The grade is used for monitoring only and never changes what you see.",

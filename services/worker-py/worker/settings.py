@@ -122,6 +122,12 @@ TELEGRAM_API_URL = os.environ.get("TELEGRAM_API_URL", "https://api.telegram.org"
 # CRM sync (docs/crm.md): Twenty's REST API; URL or key empty = dry run (logs only).
 TWENTY_API_URL = os.environ.get("TWENTY_API_URL", "")  # with --profile crm: http://twenty:3000
 TWENTY_API_KEY = os.environ.get("TWENTY_API_KEY", "")
+# Stack console planning agent (docs/admin.md "Plan a change"). No default model: unset = off.
+# Its AI calls are audited under STACK_AI_ORG_ID, the operator's own organization.
+AI_STACK_PLAN_PROVIDER = os.environ.get("AI_STACK_PLAN_PROVIDER", "")
+AI_STACK_PLAN_MODEL = os.environ.get("AI_STACK_PLAN_MODEL", "")
+STACK_AI_ORG_ID = os.environ.get("STACK_AI_ORG_ID", "")
+COMPONENTS_FILE = Path(os.environ.get("COMPONENTS_FILE", _ROOT / "config" / "components.json"))
 CRM_FILE = Path(os.environ.get("CRM_FILE", _ROOT / "config" / "crm.json"))
 # Links to bookings in CRM notes: your self-hosted Cal.diy (or https://app.cal.com); empty = none.
 BOOKING_PUBLIC_URL = os.environ.get("BOOKING_PUBLIC_URL", "")

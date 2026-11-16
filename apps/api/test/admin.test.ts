@@ -3,7 +3,15 @@
 import { randomUUID } from 'node:crypto';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { auditLog, rewardGrants, session, user as users, withOperatorRead, withOrg } from '@app/db';
+import {
+  auditLog,
+  rewardGrants,
+  session,
+  stackPlans,
+  user as users,
+  withOperatorRead,
+  withOrg,
+} from '@app/db';
 import { and, eq, like } from 'drizzle-orm';
 import type { LightMyRequestResponse } from 'fastify';
 import * as OTPAuth from 'otpauth';
@@ -202,6 +210,46 @@ describe('stack (docs/admin.md "Stack")', () => {
     expect(by.backups).toBeUndefined(); // not available yet in config/components.json
     expect(by.vault).toMatchObject({ description: expect.stringMatching(/\(Vaultwarden\)$/) });
     expect(body.components.some((c) => /docs\//.test(JSON.stringify(c)))).toBe(false);
+  });
+
+  it('plans a change; approving needs a recent sign-in and the stack it was made for', async () => {
+    expect(
+      (await post(owner, '/api/admin/stack/plans', { request: 'We need a CRM' })).statusCode,
+    ).toBe(403);
+    const made = await post(op, '/api/admin/stack/plans', { request: 'We need a CRM' });
+    expect(made.statusCode).toBe(201);
+    const plan = made.json() as { id: string; status: string; current: boolean };
+    expect(plan).toMatchObject({ status: 'drafting', current: true, actions: [] });
+    const approve = () => post(op, `/api/admin/stack/plans/${plan.id}/approve`);
+    expect((await approve()).statusCode).toBe(409); // still drafting
+
+    // What the worker writes (services/worker-py/tests/test_stack.py covers the agent).
+    const ready = (stackVersion = process.env.STACK_MODES ?? '') =>
+      db
+        .update(stackPlans)
+        .set({ status: 'ready', actions: [{ component: 'crm', mode: 'install' }], stackVersion })
+        .where(eq(stackPlans.id, plan.id));
+    await ready('core:install');
+    expect((await approve()).json()).toEqual({
+      error: 'the stack changed since this plan was made: ask again',
+    });
+    await ready();
+    const signedIn = (at: Date) =>
+      db.update(session).set({ createdAt: at }).where(eq(session.userId, op.id));
+    await signedIn(new Date(Date.now() - 20 * 60_000));
+    expect((await approve()).statusCode).toBe(401);
+    await signedIn(new Date());
+    const ok = await approve();
+    expect(ok.json()).toMatchObject({ status: 'approved', current: true });
+    expect((await approve()).statusCode).toBe(409); // once
+    const list = (await get(op, '/api/admin/stack/plans')).json() as { id: string }[];
+    expect(list[0]?.id).toBe(plan.id);
+    const rows = await withOperatorRead(db, (tx) =>
+      tx.select().from(auditLog).where(eq(auditLog.target, plan.id)),
+    );
+    expect(rows.map((r) => [r.action, r.actorId, r.orgId])).toEqual([
+      ['operator.stack_plan.approved', op.id, null],
+    ]);
   });
 
   it('reads only known modes from STACK_MODES', async () => {

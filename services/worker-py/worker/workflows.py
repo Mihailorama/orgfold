@@ -35,6 +35,7 @@ with workflow.unsafe.imports_passed_through():
         Step,
     )
     from worker.rewards import Applied, RewardActivities, RewardRequest
+    from worker.stack import StackActivities, StackPlan
     from worker.support import SupportActivities, SupportConversation, SupportIssueClosed
     from worker.telegram import TelegramActivities, TelegramChat, TelegramUpdate
     from worker.tracker import TrackerActivities, TrackerItem
@@ -76,6 +77,30 @@ class SupportTriageWorkflow:
             start_to_close_timeout=timedelta(minutes=3),  # up to two LLM calls
             retry_policy=RetryPolicy(initial_interval=timedelta(seconds=10), maximum_attempts=3),
         )
+
+
+@workflow.defn(name="StackPlanWorkflow")
+class StackPlanWorkflow:
+    """Started by POST /api/admin/stack/plans, id `stack-plan-<plan id>`."""
+
+    @workflow.run
+    async def run(self, p: StackPlan) -> str:
+        try:
+            return await workflow.execute_activity_method(
+                StackActivities.plan,
+                p,
+                # Above AI_CLI_TIMEOUT_SECONDS (330 s): a slow CLI call must not run twice.
+                start_to_close_timeout=timedelta(minutes=6),
+                retry_policy=RetryPolicy(initial_interval=timedelta(seconds=5), maximum_attempts=3),
+            )
+        except ActivityError:
+            await workflow.execute_activity_method(
+                StackActivities.failed,
+                p,
+                start_to_close_timeout=timedelta(seconds=30),
+                retry_policy=RetryPolicy(maximum_attempts=10),
+            )
+            return "failed"
 
 
 @workflow.defn(name="SupportIssueClosedWorkflow")
