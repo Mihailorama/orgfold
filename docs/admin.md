@@ -82,12 +82,15 @@ the account's role to `user`.
   `STACK_AI_ORG_ID`, or an "Operator console" organization the worker makes on first use.
 - **Connect a model** (the console's first step, then "Model" on the Stack page): until a model is
   connected, `/admin` opens on this step, as an agent's setup starts (`Skip for now` hides it for
-  the browser session). The operator picks how: a **ChatGPT subscription** ("Sign in with ChatGPT"
-  shows a sign-in link and a one-time code; llm-cli runs `codex login --device-auth` on the server
-  and keeps the login, refreshed tokens included), a **Claude subscription** (they run
-  `claude setup-token` on their computer and paste the token), or an **API key** (Anthropic,
-  OpenAI, Gemini, OpenRouter), then a model the contour lets plan the stack (ChatGPT defaults to
-  `gpt-6.1-sol`). Logins never leave llm-cli; a key is encrypted at once (`platform_ai`, bound to
+  the browser session). The operator picks a vendor (one card with its logo each: OpenAI,
+  Anthropic, Google), then how: a **ChatGPT subscription** ("Sign in with ChatGPT" shows a sign-in
+  link and a one-time code; llm-cli runs `codex login --device-auth` on the server and keeps the
+  login, refreshed tokens included), a **Claude subscription** (they run `claude setup-token` on
+  their computer and paste the token), or an **API key**. A finished sign-in connects at once.
+  There is no model picker: the vendor's first `stack.plan` model in the contour is connected
+  (`gpt-6.1-sol` for OpenAI, `claude-opus-5-5` for Anthropic); the API accepts another listed
+  model, for agents that pick per task later. A vendor appears only when LiteLLM knows its price
+  or the row is unmetered (OpenRouter is not listed for that reason). Logins never leave llm-cli; a key is encrypted at once (`platform_ai`, bound to
   `platform/default`, WEBHOOK_ENCRYPTION_KEYS) and only the worker's gateway decrypts it. Each
   change needs a sign-in of the last 10 minutes and writes `operator.ai.connected`,
   `operator.ai.signed_in`, `operator.ai.sign_in_started` or `operator.ai.disconnected`.
