@@ -6,6 +6,10 @@ FROM node:22-trixie-slim
 ARG CLAUDE_CODE_VERSION=2.1.319
 ARG CODEX_VERSION=0.169.0
 ARG GEMINI_CLI_VERSION=0.67.0
+# CA roots: Node ships its own, the Rust CLIs (Codex) read the system store; without it every
+# Codex request fails with "error sending request".
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 RUN npm install -g --no-fund --no-audit "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
       "@openai/codex@${CODEX_VERSION}" "@google/gemini-cli@${GEMINI_CLI_VERSION}" \
   && npm cache clean --force
