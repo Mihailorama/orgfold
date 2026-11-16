@@ -34,7 +34,17 @@ const LABEL: Record<string, string> = {
   openrouter: 'OpenRouter API key',
 };
 const LOGIN_OF: Record<string, 'claude' | 'codex'> = { claude_cli: 'claude', codex_cli: 'codex' };
-/** What the operator can pick: offered providers whose models this contour lets plan the stack. */
+/** The vendor each way to connect belongs to: the console groups them under one logo. */
+const BRAND: Record<string, string> = {
+  codex_cli: 'openai',
+  openai: 'openai',
+  claude_cli: 'anthropic',
+  anthropic: 'anthropic',
+  gemini: 'google',
+  openrouter: 'openrouter',
+};
+/** What the operator can pick: offered providers whose models this contour lets plan the stack.
+ * The first model of each is the one connected (the registry's order); there is no model picker. */
 function options() {
   const rows = (registry.contours[env.AI_CONTOUR] ?? []).filter(
     (r) => LABEL[r.provider] && r.purposes.includes('stack.plan'),
@@ -43,7 +53,10 @@ function options() {
     const models = rows.filter((r) => r.provider === provider).map((r) => r.model);
     if (!models.length) return [];
     const kind = registry.providers[provider]?.kind === 'cli' ? 'subscription' : 'key';
-    return [{ provider, label: LABEL[provider]!, kind: kind as 'subscription' | 'key', models }];
+    const brand = BRAND[provider] ?? provider;
+    return [
+      { provider, brand, label: LABEL[provider]!, kind: kind as 'subscription' | 'key', models },
+    ];
   });
 }
 
@@ -84,6 +97,7 @@ const Ai = z.object({
   options: z.array(
     z.object({
       provider: z.string(),
+      brand: z.string(),
       label: z.string(),
       kind: z.enum(['subscription', 'key']),
       models: z.array(z.string()),
@@ -132,7 +146,7 @@ export const adminAiRoutes: FastifyPluginAsyncZod = async (app) => {
         hide: true,
         body: z.object({
           provider: z.string(),
-          model: z.string(),
+          model: z.string().optional(),
           apiKey: z.string().trim().min(8).max(4096).optional(),
         }),
         response: { 200: z.object({ ok: z.literal(true) }), 400: ErrorBody, 401: ErrorBody },
@@ -140,9 +154,11 @@ export const adminAiRoutes: FastifyPluginAsyncZod = async (app) => {
     },
     async (req) => {
       fresh(req.operator.signedInAt);
-      const { provider, model, apiKey } = req.body;
+      const { provider, apiKey } = req.body;
       const option = options().find((o) => o.provider === provider);
-      if (!option?.models.includes(model)) throw httpError(400, 'not a model offered here');
+      const model = req.body.model ?? option?.models[0];
+      if (!model || !option?.models.includes(model))
+        throw httpError(400, 'not a model offered here');
       const [row] = await db.select().from(platformAi).where(eq(platformAi.id, 'default'));
       let key: { apiKey: string | null; apiKeyHint: string | null } = {
         apiKey: null,

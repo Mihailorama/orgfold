@@ -264,10 +264,14 @@ describe('stack (docs/admin.md "Stack")', () => {
     expect(first.connected).toBeNull();
     expect(first.logins).toBeNull(); // no llm-cli in the test env: subscriptions not available
     const anthropic = first.options.find((o) => o.provider === 'anthropic');
-    expect(anthropic).toMatchObject({ kind: 'key' });
+    // one logo per vendor; the default model is the registry's first (Opus 5.5, GPT-6.1-sol)
+    expect(anthropic).toMatchObject({ kind: 'key', brand: 'anthropic' });
+    expect(anthropic?.models[0]).toBe('claude-opus-5-5');
+    expect(first.options.find((o) => o.provider === 'openai')).toMatchObject({ brand: 'openai' });
     expect(first.options.find((o) => o.provider === 'codex_cli')).toMatchObject({
       kind: 'subscription',
-      models: expect.arrayContaining(['gpt-6.1-sol']),
+      brand: 'openai',
+      models: ['gpt-6.1-sol', 'gpt-6-astra'],
     });
     const put = (json: object) => call(op, 'PUT', '/api/admin/ai', json);
     const model = anthropic?.models[0] ?? '';
@@ -290,8 +294,8 @@ describe('stack (docs/admin.md "Stack")', () => {
     const after = (await get(op, '/api/admin/ai')).json() as { connected: object };
     expect(after.connected).toMatchObject({ provider: 'anthropic', model, keyHint: '0123' });
     expect(JSON.stringify(after)).not.toContain(key);
-    // same vendor again: the stored key stays
-    expect((await put({ provider: 'anthropic', model })).statusCode).toBe(200);
+    // same vendor again, no model named (the console has no picker): the stored key stays
+    expect((await put({ provider: 'anthropic' })).statusCode).toBe(200);
     expect((await db.select().from(platformAi))[0]?.apiKey).toBe(row?.apiKey);
     const audit = await withOperatorRead(db, (tx) =>
       tx.select().from(auditLog).where(eq(auditLog.action, 'operator.ai.connected')),

@@ -42,7 +42,7 @@ test('view as user is read-only with a banner; suspend shows members a notice', 
   await expect(
     page.getByRole('heading', { name: 'Connect a model for your agents' }),
   ).toBeVisible();
-  await expect(page.getByRole('radio', { name: /Anthropic API key/ })).toBeVisible();
+  await expect(page.getByRole('radio', { name: /Anthropic/ })).toBeVisible();
   await expectAccessibleInBothThemes(page, 'admin-connect-model');
   await page.getByRole('button', { name: 'Skip for now' }).click();
   await page.getByLabel('Search').fill(org);
