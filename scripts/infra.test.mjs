@@ -11,6 +11,7 @@ import {
   command,
   expandField,
   freshEnvError,
+  option,
   plan,
   render,
   rotateErrors,
@@ -266,6 +267,11 @@ test('--rotate only what the server re-applies', () => {
   ]);
   assert.equal(errors.length, 3);
   assert.match(errors[0], /--rotate POSTGRES_PASSWORD: nothing re-applies it/);
+});
+
+test('an absent flag has no value: verify without --org bills no organization', () => {
+  assert.equal(option(['demo', 'verify'], '--org'), undefined);
+  assert.equal(option(['verify', '--org', 'org_1'], '--org'), 'org_1');
 });
 
 test('the subcommand counts wherever it stands: a misplaced plan stays a dry run', () => {

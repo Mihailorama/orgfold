@@ -78,7 +78,13 @@
       },
       {
         "provider": "codex_cli",
-        "model": "gpt-5.5",
+        "model": "gpt-6.1-sol",
+        "purposes": ["project.summary", "support.triage", "stack.plan"],
+        "unmetered": true
+      },
+      {
+        "provider": "codex_cli",
+        "model": "gpt-6-astra",
         "purposes": ["project.summary", "support.triage", "stack.plan"],
         "unmetered": true
       },

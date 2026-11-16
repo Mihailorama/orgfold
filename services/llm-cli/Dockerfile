@@ -4,7 +4,7 @@
 # and push it only to a private registry. Logins are mounted at run time, never baked in.
 FROM node:22-trixie-slim
 ARG CLAUDE_CODE_VERSION=2.1.319
-ARG CODEX_VERSION=0.167.0
+ARG CODEX_VERSION=0.169.0
 ARG GEMINI_CLI_VERSION=0.67.0
 RUN npm install -g --no-fund --no-audit "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
       "@openai/codex@${CODEX_VERSION}" "@google/gemini-cli@${GEMINI_CLI_VERSION}" \

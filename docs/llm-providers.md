@@ -106,7 +106,7 @@ structured output where the CLI has it:
 Sources (checked 2026-11-07): Claude Code `claude --help` 2.1.319 and
 [headless](https://code.claude.com/docs/en/headless) / [authentication](https://code.claude.com/docs/en/authentication)
 docs ("generate a one-year OAuth token with `claude setup-token`"); Codex `codex exec --help`
-0.167.0 and [non-interactive mode](https://developers.openai.com/codex/noninteractive); Gemini
+0.169.0 and [non-interactive mode](https://developers.openai.com/codex/noninteractive); Gemini
 CLI [reference](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/cli-reference.md)
 ("Prompt text. Appended to stdin input if provided. Forces non-interactive mode.") and
 [system prompt](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/system-prompt.md).
@@ -122,7 +122,7 @@ environment variable). A tool that can read files or run commands would let a pr
 in user content copy that token into the answer, which is stored and shown. So every adapter turns
 tools off, and the run's working directory is a scratch dir outside HOME. Checked against a local
 mock of each vendor API, recording the tool list the CLI sends (Codex 0.167.0, Gemini CLI 0.67.0,
-2026-11-07):
+2026-11-07; Codex 0.169.0 again on 2026-11-16 with model `gpt-5.5`, the same two tools left):
 
 - Codex: `--sandbox read-only` alone still offers `exec_command` (shell; read-only still reads
   every file), `view_image`, `web_search`, `tool_search` and goal tools. The `--disable` features

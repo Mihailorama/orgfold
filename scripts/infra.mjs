@@ -713,6 +713,10 @@ export function command(words) {
   return { cmd, only, planId, words: rest };
 }
 
+/** The value after a flag, or undefined when the flag is absent (never another argument). */
+export const option = (argv, name) =>
+  argv.includes(name) ? argv[argv.indexOf(name) + 1] : undefined;
+
 const modesOf = (s) => Object.fromEntries((s ?? '').split(',').map((p) => p.split(':')));
 const sameModes = (x, y) =>
   Object.keys({ ...x, ...y }).every((id) => (x[id] ?? 'skip') === (y[id] ?? 'skip'));
@@ -760,7 +764,7 @@ async function main() {
   process.chdir(ROOT);
   const argv = process.argv.slice(2).filter((x) => x !== '--');
   const VALUED = ['--answers', '--rotate', '--org'];
-  const opt = (n) => argv[argv.indexOf(n) + 1];
+  const opt = (n) => option(argv, n);
   const rotate = argv.flatMap((x, i) => (x === '--rotate' ? [argv[i + 1]] : []));
   const { cmd, only, planId, words } = command(
     argv.filter((x, i) => !x.startsWith('--') && !VALUED.includes(argv[i - 1])),
