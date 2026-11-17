@@ -201,6 +201,29 @@ export const stack: { group: string; tools: Tool[] }[] = [
         href: 'https://glitchtip.com',
         connect: 'Sentry, same SDKs, only the DSN changes',
       },
+      {
+        name: 'Allure',
+        role: 'test reports for every CI run',
+        license: 'Apache-2.0',
+        images: ['frankescobar/allure-docker-service'],
+        href: 'https://allurereport.org',
+      },
+      {
+        name: 'ReportPortal',
+        role: 'test results server, failure triage',
+        license: 'Apache-2.0',
+        images: [
+          'reportportal/service-api',
+          'reportportal/service-ui',
+          'reportportal/service-index',
+          'reportportal/service-authorization',
+          'reportportal/service-jobs',
+          'reportportal/service-auto-analyzer',
+          'reportportal/migrations',
+          'opensearchproject/opensearch',
+        ],
+        href: 'https://reportportal.io',
+      },
     ],
   },
   {
@@ -314,4 +337,7 @@ export const notShown = [
   'stripe/stripe-mock',
   'ubuntu',
   'registry',
+  // ReportPortal's own router and queue, shown as part of ReportPortal.
+  'traefik',
+  'rabbitmq',
 ];

@@ -43,6 +43,17 @@ on an image that is not. Their primary software licenses:
 | `quay.io/oauth2-proxy/oauth2-proxy`                | staff sign-in gate for tools without a login (`gate` profile)   | MIT                         |
 | `ghcr.io/openhands/agent-canvas`                   | app builder: coding agents on this server (`openhands` profile) | MIT                         |
 | `ghcr.io/stackblitz-labs/bolt.diy`                 | app builder in the browser (`bolt` profile)                     | MIT (+ WebContainers terms) |
+| `frankescobar/allure-docker-service`               | test reports with history (`allure` profile)                    | Apache-2.0                  |
+| `reportportal/service-api`                         | ReportPortal API (`reportportal` profile)                       | Apache-2.0                  |
+| `reportportal/service-ui`                          | ReportPortal web UI (`reportportal` profile)                    | Apache-2.0                  |
+| `reportportal/service-index`                       | ReportPortal entry page (`reportportal` profile)                | Apache-2.0                  |
+| `reportportal/service-authorization`               | ReportPortal sign-in (`reportportal` profile)                   | Apache-2.0                  |
+| `reportportal/service-jobs`                        | ReportPortal cleanup jobs (`reportportal` profile)              | Apache-2.0                  |
+| `reportportal/service-auto-analyzer`               | ReportPortal failure triage (`reportportal` profile)            | Apache-2.0                  |
+| `reportportal/migrations`                          | ReportPortal schema (`reportportal` profile)                    | Apache-2.0                  |
+| `traefik`                                          | ReportPortal path router (`reportportal` profile)               | MIT                         |
+| `rabbitmq`                                         | ReportPortal queue (`reportportal` profile)                     | MPL-2.0                     |
+| `opensearchproject/opensearch`                     | ReportPortal log search (`reportportal` profile)                | Apache-2.0                  |
 | `stripe/stripe-mock`                               | Stripe API mock for tests/dev (`billing` profile)               | MIT                         |
 | `node` + `@modelcontextprotocol/server-everything` | reference MCP server, run unmodified via `npx` (`mcp` profile)  | MIT / Apache-2.0            |
 | `vllm/vllm-openai`                                 | self-hosted models, GPU (`local-llm` profile)                   | Apache-2.0                  |
@@ -252,6 +263,15 @@ Notes:
     in a commercial, for-profit setting (including for employees) needs a commercial license, and
     prototypes do not. That is a term of StackBlitz's service, not of the image: the catalog says
     it where the owner picks bolt.diy.
+- Test reports ([docs/test-reports.md](test-reports.md)), checked 2026-11-17, all run unmodified:
+  - `frankescobar/allure-docker-service` (2.44.0, `allure` profile): Apache-2.0
+    ([LICENSE](https://github.com/fescobar/allure-docker-service/blob/master/LICENSE)); it bundles
+    Allure Report 2, Apache-2.0 ([allure2](https://github.com/allure-framework/allure2)).
+  - ReportPortal 26.0.7 (`reportportal` profile): every `reportportal/*` service repository is
+    Apache-2.0 ([reportportal/reportportal](https://github.com/reportportal/reportportal)). Its
+    infrastructure: `traefik` MIT, `opensearchproject/opensearch` Apache-2.0, `rabbitmq` MPL-2.0
+    (file-level copyleft, run unmodified; [LICENSE](https://github.com/rabbitmq/rabbitmq-server/blob/main/LICENSE)),
+    and the `postgres` image above.
 - Secrets vault ([docs/secrets.md](secrets.md), ADR 0029), checked 2026-11-08:
   - `vaultwarden/server` (Vaultwarden 1.37.5, `vault` profile): its
     [LICENSE.txt](https://github.com/dani-garcia/vaultwarden/blob/main/LICENSE.txt) is the GNU

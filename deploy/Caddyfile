@@ -7,8 +7,8 @@
 # A site only operators may open (tools without a login of their own): `import gated <upstream>`.
 # Caddy asks the gate (oauth2-proxy, profile gate, docs/sso.md) on every request; without a valid
 # cookie the visitor goes to GATE_PUBLIC_URL to sign in with the app, then comes back.
-(gated) {
-	tls {$CADDY_TLS}
+# `import gate_check` is the check alone, for a site that lets some paths through (deploy/sites/allure.caddy).
+(gate_check) {
 	forward_auth gate:4180 {
 		uri /oauth2/auth
 		copy_headers X-Auth-Request-User X-Auth-Request-Email
@@ -18,6 +18,10 @@
 			redir {$GATE_PUBLIC_URL}/oauth2/start?rd={scheme}://{host}{uri} 302
 		}
 	}
+}
+(gated) {
+	tls {$CADDY_TLS}
+	import gate_check
 	reverse_proxy {args[0]}
 }
 

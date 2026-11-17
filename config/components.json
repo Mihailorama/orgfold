@@ -511,6 +511,53 @@
       }
     },
     {
+      "id": "allure",
+      "title": "Test reports (Allure)",
+      "tier": "optional",
+      "processor": false,
+      "description": "Allure server: a report for every CI run with history and trends, for operators behind the sign-in gate; light. Alerts come from the CI run itself (docs/test-reports.md)",
+      "modes": ["install", "skip"],
+      "requires": {
+        "install": ["gate:install"]
+      },
+      "install": {
+        "profile": "allure",
+        "ramMiB": 768,
+        "site": "ALLURE_PUBLIC_URL",
+        "env": {
+          "ALLURE_PUBLIC_URL": "https://tests.{domain}",
+          "ALLURE_CI_PASSWORD": "{hex:16}",
+          "ALLURE_JWT_SECRET": "{hex:32}"
+        }
+      },
+      "verify": {
+        "install": "docker compose exec -T caddy wget -qO- http://allure:5050/allure-docker-service/version"
+      }
+    },
+    {
+      "id": "reportportal",
+      "title": "Test reports (ReportPortal)",
+      "tier": "optional",
+      "processor": false,
+      "description": "ReportPortal: test results server with dashboards, failure triage and email alerts, its own logins; about 3 GiB of memory in use, 6.3 GiB of limits (docs/test-reports.md)",
+      "modes": ["install", "skip"],
+      "install": {
+        "profile": "reportportal",
+        "ramMiB": 6464,
+        "site": "REPORTPORTAL_PUBLIC_URL",
+        "after": "deploy/setup/reportportal-setup.sh",
+        "env": {
+          "REPORTPORTAL_PUBLIC_URL": "https://reports.{domain}",
+          "REPORTPORTAL_DB_PASSWORD": "{hex:24}",
+          "REPORTPORTAL_RABBITMQ_PASSWORD": "{hex:24}",
+          "REPORTPORTAL_ADMIN_PASSWORD": "{hex:16}"
+        }
+      },
+      "verify": {
+        "install": "docker compose exec -T caddy wget -qO- http://rp-gateway:8080/api/health"
+      }
+    },
+    {
       "id": "crm",
       "title": "CRM (Twenty)",
       "tier": "optional",

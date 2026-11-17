@@ -8,7 +8,7 @@
 # booking (Cal.diy, image built by CI from a pinned upstream commit, IMAGE_CALDIY),
 # vault (Vaultwarden, the secrets vault, docs/secrets.md), analytics (Umami, docs/product-analytics.md),
 # gate (oauth2-proxy: the staff sign-in gate, docs/sso.md), openhands and bolt (app builders behind
-# the gate, docs/app-builders.md).
+# the gate, docs/app-builders.md), allure and reportportal (test reports, docs/test-reports.md).
 # `pnpm run infra` (docs/setup.md) writes the env file and picks the profiles for you.
 # Licenses of every image: docs/LICENSES.md.
 
@@ -18,6 +18,23 @@ x-logging: &logging
     labels: "com.docker.compose.project,com.docker.compose.service"
     max-size: 10m
     max-file: "5"
+
+# ReportPortal services' shared settings (profile reportportal, below).
+x-rp-env: &rp-env
+  RP_DB_HOST: rp-postgres
+  RP_DB_PORT: "5432"
+  RP_DB_USER: rpuser
+  RP_DB_PASS: ${REPORTPORTAL_DB_PASSWORD:-}
+  RP_DB_NAME: reportportal
+  RP_AMQP_HOST: rp-rabbitmq
+  RP_AMQP_PORT: "5672"
+  RP_AMQP_APIPORT: "15672"
+  RP_AMQP_USER: rabbitmq
+  RP_AMQP_PASS: ${REPORTPORTAL_RABBITMQ_PASSWORD:-}
+  RP_AMQP_APIUSER: rabbitmq
+  RP_AMQP_APIPASS: ${REPORTPORTAL_RABBITMQ_PASSWORD:-}
+  RP_AMQP_ANALYZER-VHOST: analyzer
+  DATASTORE_TYPE: filesystem
 
 services:
   # Reverse proxy + automatic HTTPS (ADR 0016). The only service with public ports.
@@ -38,6 +55,8 @@ services:
       GATE_PUBLIC_URL: ${GATE_PUBLIC_URL:-}
       OPENHANDS_PUBLIC_URL: ${OPENHANDS_PUBLIC_URL:-}
       BOLT_PUBLIC_URL: ${BOLT_PUBLIC_URL:-}
+      ALLURE_PUBLIC_URL: ${ALLURE_PUBLIC_URL:-}
+      REPORTPORTAL_PUBLIC_URL: ${REPORTPORTAL_PUBLIC_URL:-}
       # vault site: who may reach Vaultwarden's /admin; everyone else gets 403
       VAULT_ADMIN_IPS: ${VAULT_ADMIN_IPS:-127.0.0.1/32}
     ports:
@@ -50,7 +69,7 @@ services:
       - caddy_data:/data # certificates and ACME account: keep this volume
       - caddy_config:/config
     # builders: the app builders' own network (below); Caddy and the gate are the only way in.
-    networks: [default, builders]
+    networks: [default, builders, tests]
 
   # One-shot: schema migrations + app role. scripts/deploy.mjs runs it with `docker compose run`
   # BEFORE `up`: within one `up`, Compose recreates api/worker/web before waiting for it, so a
@@ -755,6 +774,246 @@ services:
       retries: 12
     networks: [builders]
 
+  # --- Test reports (docs/test-reports.md): CI sends each run's JUnit XML (scripts/test-report.mjs)
+  # to one or both. They sit on the `tests` network, reachable only through Caddy.
+  # Allure (Apache-2.0, allure-docker-service): a report per run with history and trends. CI signs
+  # in with its own admin login to send results; people open the reports behind the gate.
+  allure:
+    profiles: [allure]
+    image: frankescobar/allure-docker-service:2.44.0@sha256:ccc55fa1f9001669defec1e4a27454fb45760d99e2be4efa688cfd4e12d3dd5f
+    logging: *logging
+    mem_limit: 768m
+    restart: unless-stopped
+    environment:
+      CHECK_RESULTS_EVERY_SECONDS: NONE # a report only when CI asks for one
+      KEEP_HISTORY: "1"
+      KEEP_HISTORY_LATEST: "30"
+      SECURITY_ENABLED: "1"
+      SECURITY_USER: ci
+      SECURITY_PASS: ${ALLURE_CI_PASSWORD:-}
+      JWT_SECRET_KEY: ${ALLURE_JWT_SECRET:-} # signs the CI login's tokens
+      MAKE_VIEWER_ENDPOINTS_PUBLIC: "1" # reading is guarded by the gate in front
+    volumes: [allure_projects:/app/projects]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5050/allure-docker-service/version"]
+      interval: 10s
+      start_period: 30s
+      retries: 12
+    networks: [tests]
+
+  # ReportPortal (Apache-2.0): a test results server with dashboards, failure triage (an analyzer on
+  # OpenSearch), email notifications and its own logins. The services and settings follow upstream's
+  # docker-compose.yml (reportportal/reportportal 26.0.7), names prefixed rp-; Traefik reads its
+  # routes from a file here instead of the Docker socket.
+  rp-gateway:
+    profiles: [reportportal]
+    image: traefik:v2.11.60@sha256:74fe8a2e317dbfbdca113347633b44a00a11d57170bc01147c150469418a4bc3
+    logging: *logging
+    mem_limit: 64m
+    restart: unless-stopped
+    command:
+      - --providers.file.filename=/etc/traefik/routes.yml
+      - --entrypoints.web.address=:8080
+      - --entrypoints.traefik.address=:8081
+      - --api.insecure=true # the index service reads the routes from this API (port 8081, not published)
+    configs: [{ source: rp_routes, target: /etc/traefik/routes.yml }]
+    networks: [tests]
+  rp-postgres:
+    profiles: [reportportal]
+    image: postgres:18.6@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42
+    logging: *logging
+    mem_limit: 512m
+    shm_size: 256m
+    restart: unless-stopped
+    environment:
+      {
+        POSTGRES_USER: rpuser,
+        POSTGRES_PASSWORD: "${REPORTPORTAL_DB_PASSWORD:-}",
+        POSTGRES_DB: reportportal,
+      }
+    volumes: [rp_postgres:/var/lib/postgresql]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d reportportal -U rpuser"]
+      interval: 10s
+      retries: 12
+    networks: [tests]
+  rp-rabbitmq:
+    profiles: [reportportal]
+    image: rabbitmq:4.4.0-management@sha256:753099a19b577c322117f793f864b3129cbba96d40317221a69d73976e3c843c
+    logging: *logging
+    mem_limit: 512m
+    restart: unless-stopped
+    environment:
+      {
+        RABBITMQ_DEFAULT_USER: rabbitmq,
+        RABBITMQ_DEFAULT_PASS: "${REPORTPORTAL_RABBITMQ_PASSWORD:-}",
+      }
+    configs:
+      - { source: rp_rabbitmq_conf, target: /etc/rabbitmq/conf.d/99-extra.conf }
+      - { source: rp_rabbitmq_plugins, target: /etc/rabbitmq/enabled_plugins }
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      start_period: 60s
+      retries: 5
+    networks: [tests]
+  rp-opensearch:
+    profiles: [reportportal]
+    image: opensearchproject/opensearch:3.9.0@sha256:3bf4fe26aeb9f7b03c0ebcb1302bb24e855ee6b89fd926d26a71a83ef6f7e076
+    logging: *logging
+    mem_limit: 1536m # 512m heap; 940 MiB in use idle
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      plugins.security.disabled: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+    volumes: [rp_opensearch:/usr/share/opensearch/data]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'curl -sf http://localhost:9200/_cluster/health | grep -qE ''"status":"(green|yellow)"''',
+        ]
+      interval: 30s
+      start_period: 120s
+      retries: 5
+    networks: [tests]
+  rp-migrations:
+    profiles: [reportportal]
+    image: reportportal/migrations:5.15.6@sha256:0b0d2195b9464f595f2e38156e001a28d7a83ea8bc341c14564dead48e1a0481
+    logging: *logging
+    mem_limit: 128m
+    restart: on-failure:10
+    environment:
+      POSTGRES_SERVER: rp-postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: reportportal
+      POSTGRES_USER: rpuser
+      POSTGRES_PASSWORD: ${REPORTPORTAL_DB_PASSWORD:-}
+    depends_on: { rp-postgres: { condition: service_healthy } }
+    networks: [tests]
+  rp-index:
+    profiles: [reportportal]
+    image: reportportal/service-index:5.15.2@sha256:7f78a31a8c8de586a3da002e8fe536dcc934c5355d1f63609f21cab9760fd4b0
+    logging: *logging
+    mem_limit: 64m
+    restart: unless-stopped
+    environment: { LB_URL: "http://rp-gateway:8081", TRAEFIK_V2_MODE: "true" }
+    depends_on: [rp-gateway]
+    networks: [tests]
+  rp-ui:
+    profiles: [reportportal]
+    image: reportportal/service-ui:5.15.6@sha256:7f604771ce24f9b34a1afca8ff773a7f64ae2d629a09993f010e3205a30c8c6a
+    logging: *logging
+    mem_limit: 64m
+    restart: unless-stopped
+    environment: { RP_SERVER_PORT: "8080" }
+    networks: [tests]
+  rp-api:
+    profiles: [reportportal]
+    image: reportportal/service-api:5.15.6@sha256:073981492e191aeb4c069ec6546b8b806eec4702015730528a8cd55cdb1e4513
+    logging: *logging
+    mem_limit: 1536m
+    restart: unless-stopped
+    environment:
+      <<: *rp-env
+      AUDIT_LOGGER: "OFF"
+      RP_REQUESTLOGGING: "false"
+      MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED: "false"
+      RP_ENVIRONMENT_VARIABLE_ALLOW_DELETE_ACCOUNT: "false"
+      RP_JOBS_BASEURL: http://rp-jobs:8686
+      COM_TA_REPORTPORTAL_JOB_INTERRUPT_BROKEN_LAUNCHES_CRON: PT1H
+      COM_TA_REPORTPORTAL_JOB_LOAD_PLUGINS_CRON: PT10S
+      COM_TA_REPORTPORTAL_JOB_CLEAN_OUTDATED_PLUGINS_CRON: PT10S
+      REPORTING_QUEUES_COUNT: "10"
+      REPORTING_CONSUMER_PREFETCHCOUNT: "10"
+      REPORTING_PARKINGLOT_TTL_DAYS: "7"
+      JAVA_OPTS: -Xmx1g -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp
+    volumes: [rp_storage:/data/storage]
+    depends_on:
+      rp-rabbitmq: { condition: service_healthy }
+      rp-postgres: { condition: service_healthy }
+      rp-jobs: { condition: service_healthy }
+      rp-migrations: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8585/health"]
+      interval: 30s
+      start_period: 120s
+      retries: 6
+    networks: [tests]
+  rp-uat:
+    profiles: [reportportal]
+    image: reportportal/service-authorization:5.15.2@sha256:ba5e19462975fed8fa7a387388a8a838af4f90e1dcd2a560d7493eba776a28d3
+    logging: *logging
+    mem_limit: 512m
+    restart: unless-stopped
+    environment:
+      <<: *rp-env
+      RP_SESSION_LIVE: "86400"
+      # Password of the built-in `superadmin` on first start; change it in the profile after signing in.
+      RP_INITIAL_ADMIN_PASSWORD: ${REPORTPORTAL_ADMIN_PASSWORD:-}
+      JAVA_OPTS: -Djava.security.egd=file:/dev/./urandom -XX:MinRAMPercentage=60.0 -XX:MaxRAMPercentage=90.0 --add-opens=java.base/java.lang=ALL-UNNAMED
+    volumes: [rp_storage:/data/storage]
+    depends_on: { rp-migrations: { condition: service_completed_successfully } }
+    networks: [tests]
+  rp-jobs:
+    profiles: [reportportal]
+    image: reportportal/service-jobs:5.15.3@sha256:ce806f1b3acb7ed4b1b7d6cd74e026144c58815d25864f66c8cffc5f96814ced
+    logging: *logging
+    mem_limit: 512m
+    restart: unless-stopped
+    environment:
+      <<: *rp-env
+      RP_ENVIRONMENT_VARIABLE_CLEAN_ATTACHMENT_CRON: 0 0 */24 * * *
+      RP_ENVIRONMENT_VARIABLE_CLEAN_LOG_CRON: 0 0 */24 * * *
+      RP_ENVIRONMENT_VARIABLE_CLEAN_LAUNCH_CRON: 0 0 */24 * * *
+      RP_ENVIRONMENT_VARIABLE_CLEAN_STORAGE_CRON: 0 0 */24 * * *
+      RP_ENVIRONMENT_VARIABLE_STORAGE_PROJECT_CRON: 0 */5 * * * *
+      RP_ENVIRONMENT_VARIABLE_CLEAN_EVENTS_CRON: 0 30 05 * * *
+      JAVA_OPTS: -Djava.security.egd=file:/dev/./urandom -XX:+UseG1GC -XX:MaxRAMPercentage=70.0
+    volumes: [rp_storage:/data/storage]
+    depends_on:
+      rp-rabbitmq: { condition: service_healthy }
+      rp-migrations: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8686/health"]
+      interval: 30s
+      start_period: 120s
+      retries: 6
+    networks: [tests]
+  rp-analyzer:
+    profiles: [reportportal]
+    image: reportportal/service-auto-analyzer:5.15.6@sha256:0eacfd822756deb44367088309ca49b7bf62cd3d190d5a93c24546e5ce6e3fdd
+    logging: *logging
+    mem_limit: 1g
+    restart: unless-stopped
+    environment:
+      LOGGING_LEVEL: info
+      AMQP_EXCHANGE_NAME: analyzer-default
+      AMQP_VIRTUAL_HOST: analyzer
+      AMQP_URL: amqp://rabbitmq:${REPORTPORTAL_RABBITMQ_PASSWORD:-}@rp-rabbitmq:5672
+      ES_HOSTS: http://rp-opensearch:9200
+      ANALYZER_BINARYSTORE_TYPE: filesystem
+      DATASTORE_TYPE: filesystem
+      FILESYSTEM_DEFAULT_PATH: /data/storage/analyzer
+    volumes: [rp_analyzer:/data/storage/analyzer]
+    depends_on:
+      rp-analyzer-init: { condition: service_completed_successfully }
+      rp-opensearch: { condition: service_healthy }
+      rp-rabbitmq: { condition: service_healthy }
+    networks: [tests]
+  # The analyzer runs as uid 65532; a new volume belongs to root (upstream does this with busybox).
+  rp-analyzer-init:
+    profiles: [reportportal]
+    image: reportportal/service-auto-analyzer:5.15.6@sha256:0eacfd822756deb44367088309ca49b7bf62cd3d190d5a93c24546e5ce6e3fdd
+    logging: *logging
+    user: "0:0"
+    entrypoint: ["python", "-c", "import os; os.chown('/data', 65532, 65532)"] # distroless: no shell
+    volumes: [rp_analyzer:/data]
+    network_mode: none
+    restart: "no"
+
 volumes:
   caddy_data:
   caddy_config:
@@ -764,7 +1023,38 @@ volumes:
   twenty_data:
   openhands_state:
   openhands_projects:
+  allure_projects:
+  rp_postgres:
+  rp_opensearch:
+  rp_storage:
+  rp_analyzer:
 
 networks:
   default:
   builders:
+  tests:
+
+# ReportPortal: Traefik routes (upstream sets them as Docker labels) and RabbitMQ settings.
+configs:
+  rp_routes:
+    content: |
+      http:
+        middlewares:
+          strip: { stripPrefix: { prefixes: ["/ui", "/api", "/uat"] } }
+        routers:
+          index: { rule: "PathPrefix(`/`)", service: index, entryPoints: [web] }
+          ui: { rule: "PathPrefix(`/ui`)", service: ui, middlewares: [strip], entryPoints: [web] }
+          api: { rule: "PathPrefix(`/api`)", service: api, middlewares: [strip], entryPoints: [web] }
+          uat: { rule: "PathPrefix(`/uat`)", service: uat, middlewares: [strip], entryPoints: [web] }
+        services:
+          index: { loadBalancer: { servers: [{ url: "http://rp-index:8080" }] } }
+          ui: { loadBalancer: { servers: [{ url: "http://rp-ui:8080" }] } }
+          api: { loadBalancer: { servers: [{ url: "http://rp-api:8585" }] } }
+          uat: { loadBalancer: { servers: [{ url: "http://rp-uat:9999" }] } }
+  rp_rabbitmq_conf:
+    content: |
+      deprecated_features.permit.queue_master_locator = true
+      disk_free_limit.absolute = 50MB
+  rp_rabbitmq_plugins:
+    content: |
+      [rabbitmq_management,rabbitmq_consistent_hash_exchange,rabbitmq_shovel,rabbitmq_shovel_management].

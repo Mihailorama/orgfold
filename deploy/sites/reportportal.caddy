@@ -1,0 +1,6 @@
+# Profile reportportal (test reports, docs/test-reports.md): REPORTPORTAL_PUBLIC_URL=https://reports.example.com.
+# ReportPortal has its own logins and API keys (CI sends results with one), so no gate in front.
+{$REPORTPORTAL_PUBLIC_URL} {
+	tls {$CADDY_TLS}
+	reverse_proxy rp-gateway:8080
+}

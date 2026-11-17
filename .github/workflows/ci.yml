@@ -52,6 +52,23 @@ jobs:
       - run: pnpm check
         env:
           E2E_GRAFANA_URL: http://localhost:3001
+          # JUnit XML of every suite, for the test report servers (docs/test-reports.md).
+          TEST_RESULTS_DIR: ${{ github.workspace }}/test-results
+          PYTEST_ADDOPTS: --junitxml=${{ github.workspace }}/test-results/worker.xml
+      # Sends the run to Allure and/or ReportPortal when the repository has their variables and
+      # secrets (docs/test-reports.md); without them it does nothing. A report server being down
+      # does not fail the build.
+      - name: Send test results to the report servers
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: node scripts/test-report.mjs
+        env:
+          TEST_RESULTS_DIR: ${{ github.workspace }}/test-results
+          ALLURE_URL: ${{ vars.ALLURE_URL }}
+          ALLURE_CI_PASSWORD: ${{ secrets.ALLURE_CI_PASSWORD }}
+          REPORTPORTAL_URL: ${{ vars.REPORTPORTAL_URL }}
+          REPORTPORTAL_PROJECT: ${{ vars.REPORTPORTAL_PROJECT }}
+          REPORTPORTAL_API_KEY: ${{ secrets.REPORTPORTAL_API_KEY }}
       - name: Release typecheck with official TypeScript (tsc, Go); see ADR 0011
         if: startsWith(github.ref, 'refs/tags/v')
         run: pnpm typecheck

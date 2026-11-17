@@ -1,0 +1,15 @@
+# Profile allure (test reports, docs/test-reports.md): ALLURE_PUBLIC_URL=https://tests.example.com.
+# CI sends results with the Allure server's own admin login (ALLURE_CI_PASSWORD); everything else,
+# the reports themselves, is for operators behind the gate.
+{$ALLURE_PUBLIC_URL} {
+	tls {$CADDY_TLS}
+	@ci path /allure-docker-service/login /allure-docker-service/send-results /allure-docker-service/generate-report /allure-docker-service/clean-results
+	handle @ci {
+		reverse_proxy allure:5050
+	}
+	handle {
+		import gate_check
+		redir / /allure-docker-service/latest-report 302
+		reverse_proxy allure:5050
+	}
+}
