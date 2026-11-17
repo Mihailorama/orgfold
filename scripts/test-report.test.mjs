@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mergeJunit, runName } from './test-report.mjs';
+import { allureProject, mergeJunit, runName } from './test-report.mjs';
 
 test('JUnit files merge into one testsuites document', () => {
   const a =
@@ -28,4 +28,10 @@ test('a run is named after the CI run', () => {
   );
   assert.equal(runName({ CI_PIPELINE_IID: '3', CI_COMMIT_REF_NAME: 'dev' }), 'Pipeline #3 dev');
   assert.match(runName({}), /^local /);
+});
+
+test('Allure keeps one project per branch unless ALLURE_PROJECT is set', () => {
+  assert.equal(allureProject({ GITHUB_REF_NAME: 'feat/Test reports' }), 'feat-test-reports');
+  assert.equal(allureProject({ GITHUB_REF_NAME: '117/merge', ALLURE_PROJECT: 'web' }), 'web');
+  assert.equal(allureProject({}), 'default');
 });

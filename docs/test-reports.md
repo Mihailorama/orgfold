@@ -17,7 +17,7 @@ for a team that triages failures every day, Allure for a light report.
 
 ## How results get there
 
-Every test runner writes JUnit XML when `TEST_RESULTS_DIR` is set: the Vitest configs
+The app's test runners write JUnit XML when `TEST_RESULTS_DIR` is set: the Vitest configs
 (`apps/api`, `packages/db`), `apps/web/playwright.config.ts`, and pytest through
 `PYTEST_ADDOPTS=--junitxml=...`. Nothing is added to the code: JUnit XML is built into all three,
 and both servers read it. CI (`.github/workflows/ci.yml`, job `check`) sets both and then runs
@@ -26,15 +26,16 @@ and both servers read it. CI (`.github/workflows/ci.yml`, job `check`) sets both
 node scripts/test-report.mjs            # reads $TEST_RESULTS_DIR, or ./test-results
 ```
 
-It merges the files into one run, named after the CI run (`CI #42 main`), and sends it to each
+It sends every `*.xml` in that directory, so start each run with an empty one (CI's workspace
+is fresh). It merges the files into one run, named after the CI run (`CI #42 main`), and sends it to each
 server whose variables are set; with none set it does nothing. A server that is down does not
 fail the build (`continue-on-error`). Any other CI (GitLab, a local run) calls the same script
 with the same variables.
 
-| Server       | Repository variables (Settings, Secrets and variables, Actions)                                                                |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| Allure       | variable `ALLURE_URL` (`https://tests.<domain>`), secret `ALLURE_CI_PASSWORD` (from the deploy env); optional `ALLURE_PROJECT` |
-| ReportPortal | variables `REPORTPORTAL_URL`, `REPORTPORTAL_PROJECT`; secret `REPORTPORTAL_API_KEY` (a user's API key: Profile, API keys)      |
+| Server       | Repository variables (Settings, Secrets and variables, Actions)                                                           |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| Allure       | variable `ALLURE_URL` (`https://tests.<domain>`), secret `ALLURE_CI_PASSWORD` (from the deploy env)                       |
+| ReportPortal | variables `REPORTPORTAL_URL`, `REPORTPORTAL_PROJECT`; secret `REPORTPORTAL_API_KEY` (a user's API key: Profile, API keys) |
 
 Read `ALLURE_CI_PASSWORD` from the deploy env without printing it, straight into the secret:
 `sops -d deploy/env/production.enc.env | grep '^ALLURE_CI_PASSWORD=' | cut -d= -f2- | gh secret set ALLURE_CI_PASSWORD`.
@@ -47,7 +48,8 @@ A ReportPortal you already run elsewhere needs only those three values: no insta
 (`login`, `send-results`, `generate-report`, `clean-results`), and they need the server's own
 admin login (`ci` with `ALLURE_CI_PASSWORD`). Each run keeps its own report
 (`/allure-docker-service/projects/<project>/reports/<n>/index.html`); the last 30 stay in the
-trends. Separate projects (`ALLURE_PROJECT`, e.g. one per repository) keep separate histories.
+trends. Each branch is its own project with its own history (runs of different branches never mix); set
+`ALLURE_PROJECT` to choose one yourself, e.g. one per repository.
 
 Alerts: Allure has none of its own. The CI run fails when a test fails, and GitHub (or GitLab)
 tells whoever it notifies about failed runs; the report link is in the step's log. If you need

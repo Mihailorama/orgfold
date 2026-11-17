@@ -10,7 +10,7 @@ set -eu
 for k in REPORTPORTAL_ADMIN_PASSWORD SMTP_URL MAIL_FROM; do
   grep "^$k=" .env | cut -d= -f2- | head -1 | grep . || echo
 done | docker compose exec -T rp-api python3 -c '
-import base64, hashlib, json, sys, urllib.parse, urllib.request
+import base64, hashlib, json, sys, time, urllib.error, urllib.parse, urllib.request
 VERSION = "1.1.2"
 JAR = f"https://raw.githubusercontent.com/reportportal/plugin-import-junit/{VERSION}/jars/plugin-junit-{VERSION}.jar"
 SHA256 = "a525a938576ab8a87cd88fb5e538bf8852ea29d8e6c3edb50370afaf82f2ca95"
@@ -19,8 +19,19 @@ if not pw:
     sys.exit("REPORTPORTAL_ADMIN_PASSWORD is not set")
 form = urllib.parse.urlencode({"grant_type": "password", "username": "superadmin", "password": pw}).encode()
 basic = base64.b64encode(b"ui:uiman").decode()
-token = json.load(urllib.request.urlopen(urllib.request.Request(
-    "http://rp-uat:9999/sso/oauth/token", data=form, headers={"Authorization": "Basic " + basic})))["access_token"]
+token = None
+for _ in range(36):  # the sign-in service has no healthcheck: up to 3 minutes for it to start
+    try:
+        token = json.load(urllib.request.urlopen(urllib.request.Request(
+            "http://rp-uat:9999/sso/oauth/token", data=form, headers={"Authorization": "Basic " + basic})))["access_token"]
+        break
+    except urllib.error.HTTPError:
+        # The owner changed the superadmin password, as docs/test-reports.md says: setup was done then.
+        sys.exit(print("  reportportal: superadmin password changed, setup step skipped"))
+    except OSError:
+        time.sleep(5)
+if not token:
+    sys.exit("reportportal: sign-in service did not answer in 3 minutes")
 auth = {"Authorization": "Bearer " + token}
 api = "http://127.0.0.1:8585/v1"
 
@@ -29,7 +40,7 @@ def call(path, body=None, method=None, headers=None):
     return json.load(urllib.request.urlopen(req))
 
 plugins = call("/plugin")
-if any(p["name"] == "junit" and p.get("details", {}).get("version") == VERSION for p in plugins):
+if any(p["name"] == "junit" and (p.get("details") or {}).get("version") == VERSION for p in plugins):
     print(f"  reportportal: JUnit import plugin {VERSION} in place")
 else:
     jar = urllib.request.urlopen(JAR).read()

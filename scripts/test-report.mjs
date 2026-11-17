@@ -20,9 +20,24 @@ export function mergeJunit(docs) {
       .trim();
     return body.startsWith('<testsuite')
       ? body
-      : `<testsuite name="${file}">\n${body}\n</testsuite>`;
+      : `<testsuite name="${file.replace(/[^\w.-]/g, '_')}">\n${body}\n</testsuite>`;
   });
   return `<?xml version="1.0" encoding="UTF-8"?>\n<testsuites>\n${suites.join('\n')}\n</testsuites>\n`;
+}
+
+// Allure's project when ALLURE_PROJECT is unset: one per branch, so runs of different branches
+// (which CI runs in parallel) never clean or mix each other's results, and each keeps its history.
+export function allureProject(env) {
+  const ref = env.GITHUB_REF_NAME ?? env.CI_COMMIT_REF_NAME;
+  return (
+    env.ALLURE_PROJECT ||
+    (ref
+      ? ref
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')
+      : 'default')
+  );
 }
 
 // A run's name in both tools: the CI's run, else the local time.
@@ -41,7 +56,7 @@ async function ok(res, what) {
 
 async function allure(env, xml, name) {
   const base = `${env.ALLURE_URL.replace(/\/$/, '')}/allure-docker-service`;
-  const project = env.ALLURE_PROJECT || 'default';
+  const project = allureProject(env);
   const login = await ok(
     await fetch(`${base}/login`, {
       method: 'POST',
@@ -55,7 +70,8 @@ async function allure(env, xml, name) {
   const headers = { cookie: cookies.join('; '), 'X-CSRF-TOKEN': csrf };
   const q = `project_id=${encodeURIComponent(project)}`;
   // Results of the previous run would merge into this report; history stays.
-  await fetch(`${base}/clean-results?${q}`, { headers });
+  const clean = await fetch(`${base}/clean-results?${q}`, { headers });
+  if (clean.status !== 404) await ok(clean, 'allure clean-results'); // 404: a new project
   await ok(
     await fetch(`${base}/send-results?${q}&force_project_creation=true`, {
       method: 'POST',
@@ -76,7 +92,8 @@ async function allure(env, xml, name) {
     'allure generate-report',
   );
   // The server does not know it sits behind HTTPS: keep its path, use the address we were given.
-  const url = (await gen.json()).data?.report_url ?? '';
+  const url = (await gen.json()).data?.report_url;
+  if (!url) throw new Error('allure generate-report: no report_url in the answer');
   return url.replace(/^https?:\/\/[^/]+\/allure-docker-service/, base);
 }
 
@@ -95,7 +112,8 @@ async function reportportal(env, xml, name) {
     }),
     'reportportal import',
   );
-  const { id } = await res.json();
+  const body = await res.json();
+  const id = body.id ?? body.data?.id ?? body.message ?? 'imported';
   return `${base}/ui/#${env.REPORTPORTAL_PROJECT}/launches/all (launch ${id})`;
 }
 

@@ -7,7 +7,8 @@
 	handle @ci {
 		reverse_proxy allure:5050
 	}
-	handle {
+	# route: in this order, the gate first (Caddy would otherwise sort redir before forward_auth).
+	route {
 		import gate_check
 		redir / /allure-docker-service/latest-report 302
 		reverse_proxy allure:5050
