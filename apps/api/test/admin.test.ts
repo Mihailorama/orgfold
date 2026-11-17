@@ -261,6 +261,8 @@ describe('stack (docs/admin.md "Stack")', () => {
     });
     expect(leak.statusCode).toBe(400);
     expect(leak.json().error).toMatch(/connect card/);
+    const mail = { request: 'Mail through smtps://mailer:hunter22@smtp.example.com:465' };
+    expect((await post(op, '/api/admin/stack/plans', mail)).statusCode).toBe(400);
     for (const bad of [
       { component: 'core', mode: 'skip' },
       { component: 'crm', mode: 'nope' },

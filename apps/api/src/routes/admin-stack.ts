@@ -97,7 +97,7 @@ const toActions = (actions: { component: string; mode: string }[], entered: Ente
  * carries one is refused, and the page points to the connect card. Known key shapes only.
  */
 const KEY_LIKE =
-  /\b(sk-[\w-]{16,}|sk_(live|test)_\w{10,}|(ghp|gho|github_pat)_\w{20,}|xox[abpr]-[\w-]{10,}|AKIA[0-9A-Z]{16}|eyJ[\w-]{10,}\.[\w-]{10,}\.)|\w+:\/\/[^\s/:@]+:[^\s/@]+@/;
+  /\b(sk-[\w-]{16,}|sk_(live|test)_\w{10,}|(ghp|gho|github_pat)_\w{20,}|xox[abpr]-[\w-]{10,}|AKIA[0-9A-Z]{16}|eyJ[\w-]{10,}\.[\w-]{10,}\.)|\b[a-zA-Z][\w+.-]{1,15}:\/\/[^\s/:@]{1,256}:[^\s/@]{1,256}@/;
 const Status = z.enum(['up', 'down', 'unchecked']);
 const Component = z.object({
   id: z.string(),
