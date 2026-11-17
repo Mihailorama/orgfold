@@ -67,7 +67,11 @@ oauth2-proxy (MIT) as the `gate` service. Caddy asks it on every request to a ga
 refused for anyone who is not an operator with two-factor (above), and oauth2-proxy also requires
 the `operators` group, so only operators get through. One callback for every gated site
 (`SSO_OAUTH2_PROXY_REDIRECT_URIS` = `GATE_PUBLIC_URL` + `/oauth2/callback`); the cookie is set
-for `.APP_DOMAIN`, so the gated sites are subdomains of the app's domain.
+for `.APP_DOMAIN`, so the gated sites are subdomains of the app's domain. A sign-in lasts 8 hours
+(`OAUTH2_PROXY_COOKIE_EXPIRE`), then the gate asks the app again: removing someone from
+`OPERATOR_EMAILS` locks them out of gated tools within that time. The gate reads the app's
+discovery document at its public `https://` address, so it needs a certificate the container
+trusts: it does not work with `CADDY_TLS=internal` (rehearsals, intranets with Caddy's own CA).
 
 Gate a site: put `import gated <service>:<port>` in its `deploy/sites/<profile>.caddy` (the
 snippet is in `deploy/Caddyfile`), and give the component `"requires": {"install":

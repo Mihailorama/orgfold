@@ -456,7 +456,7 @@
           "GATE_PUBLIC_URL": "https://auth.{domain}",
           "GATE_COOKIE_SECRET": "{hex:16}",
           "SSO_OAUTH2_PROXY_SECRET": "{hex:32}",
-          "SSO_OAUTH2_PROXY_REDIRECT_URIS": "https://auth.{domain}/oauth2/callback"
+          "SSO_OAUTH2_PROXY_REDIRECT_URIS": "{GATE_PUBLIC_URL}/oauth2/callback"
         },
         "rotate": ["GATE_COOKIE_SECRET", "SSO_OAUTH2_PROXY_SECRET"]
       },
@@ -470,7 +470,7 @@
       "tier": "optional",
       "group": "product",
       "processor": false,
-      "description": "OpenHands: agents build and change the company's internal apps on this server, in a sandbox, with the model you connect in it (docs/app-builders.md)",
+      "description": "OpenHands: agents build and change the company's internal apps on this server, with the model you connect in it (docs/app-builders.md)",
       "modes": ["install", "skip"],
       "requires": {
         "install": ["gate:install"]

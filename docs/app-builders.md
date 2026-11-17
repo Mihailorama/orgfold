@@ -18,7 +18,13 @@ Measured on the demo server on 2026-11-17 right after start, before any work: Op
 Both run code an agent writes and have no login of their own, so both need the staff sign-in gate
 (component `gate`, docs/sso.md): only operators with two-factor get through. They sit on their own
 Docker network, `builders`, with Caddy and the gate: no route to Postgres, Redis, Temporal or the
-API. They can reach the internet (models, package registries).
+API's own port. Through Caddy they reach only what is public anyway (the app, the vault's login),
+the same as from the internet, but from a private address: never put private ranges into
+`VAULT_ADMIN_IPS`. They can reach the internet (models, package registries).
+
+OpenHands' agent runs commands in the same container that keeps its settings and model keys, so
+code it writes or runs can read those keys. Give it a key with a spending limit, used for nothing
+else.
 
 OpenHands puts its session key into the page it serves; that is safe only because the gate is in
 front. Never publish its port or take it out from behind the gate.

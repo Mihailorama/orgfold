@@ -698,6 +698,8 @@ services:
       OAUTH2_PROXY_ALLOWED_GROUPS: operators
       OAUTH2_PROXY_CODE_CHALLENGE_METHOD: S256
       OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      # Ask the app again every 8 hours, so someone taken off OPERATOR_EMAILS is out within a day.
+      OAUTH2_PROXY_COOKIE_EXPIRE: 8h
       OAUTH2_PROXY_REVERSE_PROXY: "true"
       OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
       OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
@@ -705,10 +707,11 @@ services:
 
   # --- App builders (docs/app-builders.md): agents build the company's internal apps. Each is a
   # profile of its own, the owner picks one or several. They run code an agent writes, so they sit
-  # on the `builders` network (no route to Postgres, Redis, Temporal or the API) and are reachable
-  # only through Caddy behind the gate. Model keys are entered in each tool's own settings.
-  # OpenHands Agent Canvas (MIT): the agent works inside this container, on the `openhands_projects`
-  # volume; no Docker socket.
+  # on the `builders` network (no route to Postgres, Redis, Temporal or the API's port; through
+  # Caddy they see only what is public anyway) and are reachable only through Caddy behind the gate.
+  # Model keys are entered in each tool's own settings.
+  # OpenHands Agent Canvas (MIT): the agent runs commands inside this container, on the
+  # `openhands_projects` volume; no Docker socket. Its code can read the model keys stored here.
   openhands:
     profiles: [openhands]
     image: ghcr.io/openhands/agent-canvas:1.38.0@sha256:30e638898361d7c87350a29291d2066af9942007087510845d13f4eaf4aeab46

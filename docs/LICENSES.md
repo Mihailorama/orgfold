@@ -7,51 +7,51 @@ unmodified, not distributed with the app**, so any license is acceptable, AGPL a
 source-available included. Every image must still be listed below; `pnpm check:licenses` fails
 on an image that is not. Their primary software licenses:
 
-| Image                                              | Used for                                                       | License                     |
-| -------------------------------------------------- | -------------------------------------------------------------- | --------------------------- |
-| `postgres`                                         | database (app + Temporal)                                      | PostgreSQL                  |
-| `redis`                                            | rate-limit store                                               | RSALv2 / SSPLv1 / AGPLv3    |
-| `valkey/valkey`                                    | rate-limit store (permissive twin)                             | BSD-3-Clause                |
-| `chrislusf/seaweedfs`                              | local S3-compatible storage (dev only)                         | Apache-2.0                  |
-| `temporalio/server`                                | workflow engine                                                | MIT                         |
-| `temporalio/admin-tools`                           | Temporal schema setup, namespace                               | MIT                         |
-| `temporalio/ui`                                    | Temporal Web UI                                                | MIT                         |
-| `otel/opentelemetry-collector-contrib`             | telemetry pipeline, container logs (observability)             | Apache-2.0                  |
-| `jaegertracing/jaeger`                             | traces (observability profile)                                 | Apache-2.0                  |
-| `prom/prometheus`                                  | metrics, alert rules (observability)                           | Apache-2.0                  |
-| `grafana/loki`                                     | logs (observability profile)                                   | AGPL-3.0                    |
-| `grafana/grafana`                                  | dashboards, single pane (observability)                        | AGPL-3.0                    |
-| `glitchtip/glitchtip`                              | error tracking, Sentry API (glitchtip profile)                 | MIT                         |
-| `node`                                             | API runtime and web build                                      | MIT                         |
-| `nginxinc/nginx-unprivileged`                      | web static files + `/api` proxy                                | BSD-2-Clause                |
-| `caddy`                                            | TLS + ingress in `compose.prod.yaml` (ADR 0016)                | Apache-2.0                  |
-| `ghcr.io/astral-sh/uv`                             | worker build stage                                             | MIT OR Apache-2.0           |
-| `python`                                           | worker runtime                                                 | Python-2.0 (PSF)            |
-| `ghcr.io/umami-software/umami`                     | product analytics (`analytics` profile)                        | MIT                         |
-| `axllent/mailpit`                                  | catches outgoing mail in dev (UI/API :8025)                    | MIT                         |
-| `ghcr.io/promptfoo/promptfoo`                      | eval engine for `pnpm eval` (eval profile)                     | MIT                         |
-| `langfuse/langfuse`                                | Langfuse web (llmops profile)                                  | MIT core + `ee/` commercial |
-| `langfuse/langfuse-worker`                         | Langfuse worker (llmops profile)                               | MIT core + `ee/` commercial |
-| `clickhouse/clickhouse-server`                     | Langfuse trace store (llmops profile)                          | Apache-2.0                  |
-| `chatwoot/chatwoot`                                | service desk, `-ce` tag only (`support` profile)               | MIT                         |
-| `saas-agent-starter-postgres`                      | Postgres 17 + pgvector extension (built)                       | PostgreSQL                  |
-| `ghcr.io/gitroomhq/postiz-app`                     | social post scheduling (`marketing` profile)                   | AGPL-3.0                    |
-| `towfiqi/serpbear`                                 | keyword rank tracking (`marketing` profile)                    | MIT                         |
-| `twentycrm/twenty`                                 | CRM: people, companies, deals (`crm` profile)                  | AGPL-3.0 + app exception    |
-| `caldiy` (built from calcom/cal.diy)               | booking: "Book a demo" (`booking` profile)                     | MIT                         |
-| `vaultwarden/server`                               | secrets vault for humans and agents (`vault` profile)          | AGPL-3.0                    |
-| `quay.io/oauth2-proxy/oauth2-proxy`                | staff sign-in gate for tools without a login (`gate` profile)  | MIT                         |
-| `ghcr.io/openhands/agent-canvas`                   | app builder: coding agents in a sandbox (`openhands` profile)  | MIT                         |
-| `ghcr.io/stackblitz-labs/bolt.diy`                 | app builder in the browser (`bolt` profile)                    | MIT (+ WebContainers terms) |
-| `stripe/stripe-mock`                               | Stripe API mock for tests/dev (`billing` profile)              | MIT                         |
-| `node` + `@modelcontextprotocol/server-everything` | reference MCP server, run unmodified via `npx` (`mcp` profile) | MIT / Apache-2.0            |
-| `vllm/vllm-openai`                                 | self-hosted models, GPU (`local-llm` profile)                  | Apache-2.0                  |
-| `vllm/vllm-openai-cpu`                             | self-hosted models, CPU smoke (`local-llm-cpu`)                | Apache-2.0                  |
-| `ollama/ollama`                                    | self-hosted models, dev (`local-llm` profile)                  | MIT                         |
-| `saas-agent-starter-pgbackup`                      | Postgres + backup tools (`compose.backup.yaml`)                | PostgreSQL + MIT            |
-| `prom/pushgateway`                                 | backup metrics for Prometheus (backup overlay)                 | Apache-2.0                  |
-| `ubuntu`                                           | fresh-server stand-in of the infra e2e (deploy/setup/e2e/)     | various (Debian/Ubuntu OS)  |
-| `registry`                                         | release image registry of the infra e2e (test only)            | Apache-2.0                  |
+| Image                                              | Used for                                                        | License                     |
+| -------------------------------------------------- | --------------------------------------------------------------- | --------------------------- |
+| `postgres`                                         | database (app + Temporal)                                       | PostgreSQL                  |
+| `redis`                                            | rate-limit store                                                | RSALv2 / SSPLv1 / AGPLv3    |
+| `valkey/valkey`                                    | rate-limit store (permissive twin)                              | BSD-3-Clause                |
+| `chrislusf/seaweedfs`                              | local S3-compatible storage (dev only)                          | Apache-2.0                  |
+| `temporalio/server`                                | workflow engine                                                 | MIT                         |
+| `temporalio/admin-tools`                           | Temporal schema setup, namespace                                | MIT                         |
+| `temporalio/ui`                                    | Temporal Web UI                                                 | MIT                         |
+| `otel/opentelemetry-collector-contrib`             | telemetry pipeline, container logs (observability)              | Apache-2.0                  |
+| `jaegertracing/jaeger`                             | traces (observability profile)                                  | Apache-2.0                  |
+| `prom/prometheus`                                  | metrics, alert rules (observability)                            | Apache-2.0                  |
+| `grafana/loki`                                     | logs (observability profile)                                    | AGPL-3.0                    |
+| `grafana/grafana`                                  | dashboards, single pane (observability)                         | AGPL-3.0                    |
+| `glitchtip/glitchtip`                              | error tracking, Sentry API (glitchtip profile)                  | MIT                         |
+| `node`                                             | API runtime and web build                                       | MIT                         |
+| `nginxinc/nginx-unprivileged`                      | web static files + `/api` proxy                                 | BSD-2-Clause                |
+| `caddy`                                            | TLS + ingress in `compose.prod.yaml` (ADR 0016)                 | Apache-2.0                  |
+| `ghcr.io/astral-sh/uv`                             | worker build stage                                              | MIT OR Apache-2.0           |
+| `python`                                           | worker runtime                                                  | Python-2.0 (PSF)            |
+| `ghcr.io/umami-software/umami`                     | product analytics (`analytics` profile)                         | MIT                         |
+| `axllent/mailpit`                                  | catches outgoing mail in dev (UI/API :8025)                     | MIT                         |
+| `ghcr.io/promptfoo/promptfoo`                      | eval engine for `pnpm eval` (eval profile)                      | MIT                         |
+| `langfuse/langfuse`                                | Langfuse web (llmops profile)                                   | MIT core + `ee/` commercial |
+| `langfuse/langfuse-worker`                         | Langfuse worker (llmops profile)                                | MIT core + `ee/` commercial |
+| `clickhouse/clickhouse-server`                     | Langfuse trace store (llmops profile)                           | Apache-2.0                  |
+| `chatwoot/chatwoot`                                | service desk, `-ce` tag only (`support` profile)                | MIT                         |
+| `saas-agent-starter-postgres`                      | Postgres 17 + pgvector extension (built)                        | PostgreSQL                  |
+| `ghcr.io/gitroomhq/postiz-app`                     | social post scheduling (`marketing` profile)                    | AGPL-3.0                    |
+| `towfiqi/serpbear`                                 | keyword rank tracking (`marketing` profile)                     | MIT                         |
+| `twentycrm/twenty`                                 | CRM: people, companies, deals (`crm` profile)                   | AGPL-3.0 + app exception    |
+| `caldiy` (built from calcom/cal.diy)               | booking: "Book a demo" (`booking` profile)                      | MIT                         |
+| `vaultwarden/server`                               | secrets vault for humans and agents (`vault` profile)           | AGPL-3.0                    |
+| `quay.io/oauth2-proxy/oauth2-proxy`                | staff sign-in gate for tools without a login (`gate` profile)   | MIT                         |
+| `ghcr.io/openhands/agent-canvas`                   | app builder: coding agents on this server (`openhands` profile) | MIT                         |
+| `ghcr.io/stackblitz-labs/bolt.diy`                 | app builder in the browser (`bolt` profile)                     | MIT (+ WebContainers terms) |
+| `stripe/stripe-mock`                               | Stripe API mock for tests/dev (`billing` profile)               | MIT                         |
+| `node` + `@modelcontextprotocol/server-everything` | reference MCP server, run unmodified via `npx` (`mcp` profile)  | MIT / Apache-2.0            |
+| `vllm/vllm-openai`                                 | self-hosted models, GPU (`local-llm` profile)                   | Apache-2.0                  |
+| `vllm/vllm-openai-cpu`                             | self-hosted models, CPU smoke (`local-llm-cpu`)                 | Apache-2.0                  |
+| `ollama/ollama`                                    | self-hosted models, dev (`local-llm` profile)                   | MIT                         |
+| `saas-agent-starter-pgbackup`                      | Postgres + backup tools (`compose.backup.yaml`)                 | PostgreSQL + MIT            |
+| `prom/pushgateway`                                 | backup metrics for Prometheus (backup overlay)                  | Apache-2.0                  |
+| `ubuntu`                                           | fresh-server stand-in of the infra e2e (deploy/setup/e2e/)      | various (Debian/Ubuntu OS)  |
+| `registry`                                         | release image registry of the infra e2e (test only)             | Apache-2.0                  |
 
 Base OS layers (Alpine, Debian) contain packages under various licenses, including GPL
 utilities. They are separate programs in the image, not linked into or distributed as part of
