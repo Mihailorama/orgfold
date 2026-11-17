@@ -84,7 +84,7 @@ the account's role to `user`.
   chats: `PUT /api/admin/stack/plans/:id/connect/:component` (audited
   `operator.stack_plan.connect_entered`) stores plain values and encrypts secrets at once
   (WEBHOOK_ENCRYPTION_KEYS, bound to plan, component and field), and the page shows only a
-  secret's last 4 characters. They never reach the agent, and a request that looks like it carries
+  secret's last 4 characters; values changed after approval send the plan back to approval. They never reach the agent, and a request that looks like it carries
   a key (known key shapes, a URL with a password) is refused before it does. Apply takes them
   (secrets join the run's secrets, never the answers file; `INFRA_<KEY>` still wins) and clears
   them when it marks the plan applied.

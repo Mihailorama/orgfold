@@ -292,6 +292,9 @@ export const adminStackRoutes: FastifyPluginAsyncZod<{ redis: Redis }> = async (
         if (!c || c.tier === 'core' || !c.modes.includes(mode)) {
           throw httpError(400, 'not an action of the catalog');
         }
+        if ((parseModes(stackVersion()).get(component) ?? 'skip') === mode) {
+          throw httpError(409, 'it already runs that way');
+        }
         const [row] = await db
           .insert(stackPlans)
           .values({
@@ -390,6 +393,9 @@ export const adminStackRoutes: FastifyPluginAsyncZod<{ redis: Redis }> = async (
         if (!['ready', 'approved'].includes(plan.status)) {
           throw httpError(409, 'only a plan that has not run yet takes values');
         }
+        if (plan.stackVersion !== stackVersion()) {
+          throw httpError(409, 'the stack changed since this plan was made: ask again');
+        }
         const fields = plan.actions?.some((a) => a.component === component && a.mode === 'connect')
           ? connectFields(component)
           : [];
@@ -410,7 +416,13 @@ export const adminStackRoutes: FastifyPluginAsyncZod<{ redis: Redis }> = async (
         }
         const [row] = await tx
           .update(stackPlans)
-          .set({ connect: { ...plan.connect, [component]: mine } })
+          // New values were not approved: an approved plan goes back to waiting for approval.
+          .set({
+            connect: { ...plan.connect, [component]: mine },
+            status: 'ready',
+            approvedBy: null,
+            approvedAt: null,
+          })
           .where(eq(stackPlans.id, id))
           .returning();
         if (!row) throw new Error('update returned no row');

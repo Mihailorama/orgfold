@@ -314,6 +314,14 @@ describe('stack (docs/admin.md "Stack")', () => {
       'local-dev-twenty-key',
     );
     expect(() => openSecret(cipher, `stack-plan/${plan.id}/crm/OTHER`)).toThrow();
+    // Changed after approval: approved again before it can run.
+    await db.update(stackPlans).set({ status: 'approved' }).where(eq(stackPlans.id, plan.id));
+    expect((await enter({ TWENTY_API_URL: 'https://other.example.com' })).json()).toMatchObject({
+      status: 'ready',
+    });
+    // crm is not added (crm:skip in STACK_MODES of .env.example): removing it plans nothing.
+    const same = await post(op, '/api/admin/stack/plans', { component: 'crm', mode: 'skip' });
+    expect(same.statusCode).toBe(409);
   });
 
   it("connects the agents' model: offered pairs only, key sealed, recent sign-in, audited", async () => {
