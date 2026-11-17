@@ -1,0 +1,6 @@
+# Profile gate (oauth2-proxy, docs/sso.md): sign-in and callback for every gated site,
+# GATE_PUBLIC_URL=https://auth.example.com. The gated sites themselves use `import gated`.
+{$GATE_PUBLIC_URL} {
+	tls {$CADDY_TLS}
+	reverse_proxy gate:4180
+}

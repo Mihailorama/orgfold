@@ -65,6 +65,20 @@ export const stack: { group: string; tools: Tool[] }[] = [
     group: 'Work and AI',
     tools: [
       {
+        name: 'OpenHands',
+        role: 'agents build your internal apps',
+        license: 'MIT',
+        images: ['ghcr.io/openhands/agent-canvas'],
+        href: 'https://github.com/OpenHands/OpenHands',
+      },
+      {
+        name: 'bolt.diy',
+        role: 'app prototypes in the browser',
+        license: 'MIT (+ WebContainers terms)',
+        images: ['ghcr.io/stackblitz-labs/bolt.diy'],
+        href: 'https://github.com/stackblitz-labs/bolt.diy',
+      },
+      {
         name: 'Temporal',
         role: 'durable background jobs',
         license: 'MIT',
@@ -263,6 +277,13 @@ export const stack: { group: string; tools: Tool[] }[] = [
   {
     group: 'Trust',
     tools: [
+      {
+        name: 'oauth2-proxy',
+        role: 'staff sign-in in front of tools',
+        license: 'MIT',
+        images: ['quay.io/oauth2-proxy/oauth2-proxy'],
+        href: 'https://github.com/oauth2-proxy/oauth2-proxy',
+      },
       {
         name: 'Vaultwarden',
         role: 'secrets vault',

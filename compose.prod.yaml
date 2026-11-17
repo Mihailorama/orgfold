@@ -6,7 +6,9 @@
 # COMPOSE_PROFILES in the env file: db (Postgres), s3 (SeaweedFS), ops (Temporal UI on loopback),
 # llm-cli (vendor CLI subscriptions, an image you build yourself: docs/llm-providers.md),
 # booking (Cal.diy, image built by CI from a pinned upstream commit, IMAGE_CALDIY),
-# vault (Vaultwarden, the secrets vault, docs/secrets.md), analytics (Umami, docs/product-analytics.md).
+# vault (Vaultwarden, the secrets vault, docs/secrets.md), analytics (Umami, docs/product-analytics.md),
+# gate (oauth2-proxy: the staff sign-in gate, docs/sso.md), openhands and bolt (app builders behind
+# the gate, docs/app-builders.md).
 # `pnpm run infra` (docs/setup.md) writes the env file and picks the profiles for you.
 # Licenses of every image: docs/LICENSES.md.
 
@@ -33,6 +35,9 @@ services:
       VAULT_PUBLIC_URL: ${VAULT_PUBLIC_URL:-}
       UMAMI_PUBLIC_URL: ${UMAMI_PUBLIC_URL:-}
       CRM_PUBLIC_URL: ${CRM_PUBLIC_URL:-}
+      GATE_PUBLIC_URL: ${GATE_PUBLIC_URL:-}
+      OPENHANDS_PUBLIC_URL: ${OPENHANDS_PUBLIC_URL:-}
+      BOLT_PUBLIC_URL: ${BOLT_PUBLIC_URL:-}
       # vault site: who may reach Vaultwarden's /admin; everyone else gets 403
       VAULT_ADMIN_IPS: ${VAULT_ADMIN_IPS:-127.0.0.1/32}
     ports:
@@ -44,6 +49,8 @@ services:
       - ./sites:/etc/caddy/sites:ro
       - caddy_data:/data # certificates and ACME account: keep this volume
       - caddy_config:/config
+    # builders: the app builders' own network (below); Caddy and the gate are the only way in.
+    networks: [default, builders]
 
   # One-shot: schema migrations + app role. scripts/deploy.mjs runs it with `docker compose run`
   # BEFORE `up`: within one `up`, Compose recreates api/worker/web before waiting for it, so a
@@ -89,6 +96,8 @@ services:
       # Staff SSO into the tools (docs/sso.md): one secret + callback list per tool on this host.
       - SSO_VAULTWARDEN_SECRET
       - SSO_VAULTWARDEN_REDIRECT_URIS
+      - SSO_OAUTH2_PROXY_SECRET
+      - SSO_OAUTH2_PROXY_REDIRECT_URIS
       - POSTHOG_WEBHOOK_SECRET
       - POSTHOG_APP_HOST
       - POSTHOG_PROJECT_ID
@@ -664,6 +673,88 @@ services:
       postgres: { condition: service_healthy, required: false }
       vault-db: { condition: service_completed_successfully }
 
+  # --- profile gate: oauth2-proxy (MIT) signs people in with the app (docs/sso.md) in front of tools
+  # that have no login of their own. Caddy asks it on every request to such a site (forward_auth,
+  # the `gated` snippet in deploy/Caddyfile); only operators with two-factor get a token, so only
+  # they get through. One callback for all sites at GATE_PUBLIC_URL, the cookie covers *.APP_DOMAIN.
+  gate:
+    profiles: [gate]
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.5@sha256:8498b0d0ef0a7b29686414000a08aee467f02d0299c9ed1e006a8f33fc017916
+    logging: *logging
+    mem_limit: 64m
+    restart: unless-stopped
+    environment:
+      OAUTH2_PROXY_PROVIDER: oidc
+      OAUTH2_PROXY_OIDC_ISSUER_URL: ${BETTER_AUTH_URL:-https://${APP_DOMAIN}}/api/auth
+      OAUTH2_PROXY_CLIENT_ID: oauth2-proxy
+      OAUTH2_PROXY_CLIENT_SECRET: ${SSO_OAUTH2_PROXY_SECRET:-}
+      OAUTH2_PROXY_REDIRECT_URL: ${GATE_PUBLIC_URL:-}/oauth2/callback
+      OAUTH2_PROXY_COOKIE_SECRET: ${GATE_COOKIE_SECRET:-}
+      OAUTH2_PROXY_COOKIE_DOMAINS: .${APP_DOMAIN}
+      OAUTH2_PROXY_WHITELIST_DOMAINS: .${APP_DOMAIN}
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_SCOPE: openid email profile groups
+      OAUTH2_PROXY_OIDC_GROUPS_CLAIM: groups
+      OAUTH2_PROXY_ALLOWED_GROUPS: operators
+      OAUTH2_PROXY_CODE_CHALLENGE_METHOD: S256
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      # Ask the app again every 8 hours, so someone taken off OPERATOR_EMAILS is out within a day.
+      OAUTH2_PROXY_COOKIE_EXPIRE: 8h
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+    networks: [builders]
+
+  # --- App builders (docs/app-builders.md): agents build the company's internal apps. Each is a
+  # profile of its own, the owner picks one or several. They run code an agent writes, so they sit
+  # on the `builders` network (no route to Postgres, Redis, Temporal or the API's port; through
+  # Caddy they see only what is public anyway) and are reachable only through Caddy behind the gate.
+  # Model keys are entered in each tool's own settings.
+  # OpenHands Agent Canvas (MIT): the agent runs commands inside this container, on the
+  # `openhands_projects` volume; no Docker socket. Its code can read the model keys stored here.
+  openhands:
+    profiles: [openhands]
+    image: ghcr.io/openhands/agent-canvas:1.38.0@sha256:30e638898361d7c87350a29291d2066af9942007087510845d13f4eaf4aeab46
+    logging: *logging
+    mem_limit: 2g
+    restart: unless-stopped
+    environment:
+      # The UI gets its session key without asking: the gate is what keeps strangers out.
+      AGENT_CANVAS_ALLOW_LAN_SESSION_KEY: "true"
+      # No usage data to OpenHands: the page (DISABLE_TELEMETRY) and the agent server (DO_NOT_TRACK,
+      # its kill switch: the setting cannot turn it back on).
+      AGENT_CANVAS_DISABLE_TELEMETRY: "true"
+      DO_NOT_TRACK: "1"
+    volumes:
+      - openhands_state:/home/openhands/.openhands # settings, model keys, conversations
+      - openhands_projects:/projects
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8000/alive"]
+      interval: 10s
+      start_period: 60s
+      retries: 12
+    networks: [builders]
+
+  # bolt.diy (MIT): builds and previews apps in the visitor's browser (StackBlitz WebContainers;
+  # production use in a for-profit company needs StackBlitz's commercial license, see
+  # docs/app-builders.md). Projects live in the browser, not on the server.
+  bolt:
+    profiles: [bolt]
+    image: ghcr.io/stackblitz-labs/bolt.diy:v1.0.3@sha256:89f1061e2ffad4f51125c6f931f18a4b2aaec2a1010799ea6b9608f399d7c99e
+    logging: *logging
+    mem_limit: 1g
+    restart: unless-stopped
+    environment:
+      VITE_LOG_LEVEL: info
+      # Its server answers only hosts it knows; a leading dot allows every subdomain.
+      __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: .${APP_DOMAIN}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:5173/"]
+      interval: 10s
+      start_period: 60s
+      retries: 12
+    networks: [builders]
+
 volumes:
   caddy_data:
   caddy_config:
@@ -671,3 +762,9 @@ volumes:
   s3data:
   vault_data:
   twenty_data:
+  openhands_state:
+  openhands_projects:
+
+networks:
+  default:
+  builders:

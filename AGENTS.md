@@ -177,6 +177,7 @@ docs/legal.md       legal pages, acceptance, age, marketing consent/unsubscribe;
 docs/quality.md     quality budgets: gate config hashes, suppression cap, AGENTS.md size (`pnpm check:budgets`)
 docs/updates.md     taking starter updates into a product: merge a release tag, conflicts, migration order
 docs/sso.md         staff single sign-on into the tools (Grafana, Vaultwarden, ...): who, how, per tool
+docs/app-builders.md agents that build internal apps (OpenHands, bolt.diy) behind the sign-in gate
 ```
 
 Request path: browser -> web (`/api` same origin) -> Fastify -> `requireRole` (session,

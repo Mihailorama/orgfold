@@ -47,7 +47,20 @@ const secrets = {
 };
 
 test('the catalog covers every prod profile and example.env key', () => {
-  const profiles = ['db', 's3', 'vault', 'analytics', 'ops', 'pii', 'llm-cli', 'booking', 'crm'];
+  const profiles = [
+    'db',
+    's3',
+    'vault',
+    'analytics',
+    'ops',
+    'pii',
+    'llm-cli',
+    'booking',
+    'crm',
+    'gate',
+    'openhands',
+    'bolt',
+  ];
   const ok = checkComponents(catalog, profiles, ['DATABASE_URL']);
   assert.deepEqual(ok, []);
   const bad = checkComponents(catalog, [...profiles, 'newthing'], ['DATABASE_URL', 'NEW_KEY']);
@@ -161,7 +174,7 @@ test('plan (dry run): key names only, no value, exact text', () => {
     assert.equal(
       text,
       `Plan for production: deploy@203.0.113.10, https://app.example.com, ghcr.io/mihailorama/saas-agent-starter v1.0.0
-  components: core install, postgres install, s3 install, smtp connect, analytics install, llm connect, vault install, crm skip
+  components: core install, postgres install, s3 install, smtp connect, analytics install, llm connect, vault install, gate skip, openhands skip, bolt skip, crm skip
   profiles: + analytics, + vault
   env keys: ~ S3_ACCESS_KEY_ID (generated), + UMAMI_PUBLIC_URL, + UMAMI_DB_PASSWORD (generated), + UMAMI_APP_SECRET (generated), + UMAMI_ADMIN_PASSWORD (generated), + ANALYTICS_ORIGINS, + VAULT_PUBLIC_URL, + VAULT_DB_PASSWORD (generated), + VAULT_DATABASE_URL, + SSO_VAULTWARDEN_SECRET (generated), + SSO_VAULTWARDEN_REDIRECT_URIS, ~ STACK_MODES, - POSTHOG_HOST, - POSTHOG_KEY
   RAM budget (mem_limit): 5.5 GiB of 3.8 GiB on the server

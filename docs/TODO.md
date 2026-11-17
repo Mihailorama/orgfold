@@ -58,8 +58,8 @@
   auth header; e2e with `VITE_FLAGS_ON=mcp-tools` on the consent build or a third dev server.
 - **Staff SSO: only Grafana runs end to end** (SAASSTARTER-97) (docs/sso.md). The app is the tools' OIDC
   provider and Vaultwarden is wired in compose.prod.yaml, but Temporal UI, Langfuse, GlitchTip and
-  Postiz are documented settings only, and oauth2-proxy (for Prometheus, Jaeger, Mailpit, ...) is a
-  recipe, not a service. Twenty, Chatwoot CE, Plane CE and Cal.diy have SSO only in paid editions
+  Postiz are documented settings only. oauth2-proxy is now the `gate` profile (SAASSTARTER-104) in
+  front of the app builders; Prometheus, Jaeger and Mailpit are not behind it yet. Twenty, Chatwoot CE, Plane CE and Cal.diy have SSO only in paid editions
   or not at all: owner decision whether a gate in front (double login) is worth it. To do: wire
   each tool where it runs on this host, one e2e per tool like `e2e/sso.spec.ts`.
 - **MCP: OAuth 2.1 sign-in for hosted connectors** (SAASSTARTER-5) (docs/mcp.md, ADR 0027). `/mcp` accepts only
