@@ -75,7 +75,9 @@ trusts: it does not work with `CADDY_TLS=internal` (rehearsals, intranets with C
 
 Gate a site: put `import gated <service>:<port>` in its `deploy/sites/<profile>.caddy` (the
 snippet is in `deploy/Caddyfile`), and give the component `"requires": {"install":
-["gate:install"]}`. The app builders (docs/app-builders.md) use it. A tool on another host can use
+["gate:install"]}`. The app builders (docs/app-builders.md) use it. A site that must let a few
+paths through (CI sending results to Allure, docs/test-reports.md) uses `import gate_check` inside
+a `handle` instead: see `deploy/sites/allure.caddy`. A tool on another host can use
 the same gate by hand: point its Caddy `forward_auth` at this host's gate the same way.
 
 ## Test it
