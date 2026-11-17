@@ -442,6 +442,75 @@
       }
     },
     {
+      "id": "gate",
+      "title": "Staff sign-in gate",
+      "tier": "optional",
+      "processor": false,
+      "description": "Sign-in gate (oauth2-proxy) in front of tools without a login of their own: only operators with two-factor get through (docs/sso.md)",
+      "modes": ["install", "skip"],
+      "install": {
+        "profile": "gate",
+        "ramMiB": 64,
+        "site": "GATE_PUBLIC_URL",
+        "env": {
+          "GATE_PUBLIC_URL": "https://auth.{domain}",
+          "GATE_COOKIE_SECRET": "{hex:16}",
+          "SSO_OAUTH2_PROXY_SECRET": "{hex:32}",
+          "SSO_OAUTH2_PROXY_REDIRECT_URIS": "https://auth.{domain}/oauth2/callback"
+        },
+        "rotate": ["GATE_COOKIE_SECRET", "SSO_OAUTH2_PROXY_SECRET"]
+      },
+      "verify": {
+        "install": "docker compose exec -T caddy wget -qO- http://gate:4180/ping"
+      }
+    },
+    {
+      "id": "openhands",
+      "title": "App builder (OpenHands)",
+      "tier": "optional",
+      "group": "product",
+      "processor": false,
+      "description": "OpenHands: agents build and change the company's internal apps on this server, in a sandbox, with the model you connect in it (docs/app-builders.md)",
+      "modes": ["install", "skip"],
+      "requires": {
+        "install": ["gate:install"]
+      },
+      "install": {
+        "profile": "openhands",
+        "ramMiB": 2048,
+        "site": "OPENHANDS_PUBLIC_URL",
+        "env": {
+          "OPENHANDS_PUBLIC_URL": "https://openhands.{domain}"
+        }
+      },
+      "verify": {
+        "install": "docker compose exec -T openhands curl -fsS -o /dev/null http://127.0.0.1:8000/alive"
+      }
+    },
+    {
+      "id": "bolt",
+      "title": "App builder (bolt.diy)",
+      "tier": "optional",
+      "group": "product",
+      "processor": false,
+      "description": "bolt.diy: describe an app and see it run in your browser; for prototypes, production use in a company needs StackBlitz's commercial license (docs/app-builders.md)",
+      "modes": ["install", "skip"],
+      "requires": {
+        "install": ["gate:install"]
+      },
+      "install": {
+        "profile": "bolt",
+        "ramMiB": 1024,
+        "site": "BOLT_PUBLIC_URL",
+        "env": {
+          "BOLT_PUBLIC_URL": "https://bolt.{domain}"
+        }
+      },
+      "verify": {
+        "install": "docker compose exec -T bolt curl -fsS -o /dev/null http://127.0.0.1:5173/"
+      }
+    },
+    {
       "id": "crm",
       "title": "CRM (Twenty)",
       "tier": "optional",

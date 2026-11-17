@@ -58,38 +58,21 @@ What each tool's free edition offers was checked against its source or docs on 2
 Only Grafana runs end to end in CI. The other native rows follow each tool's own documentation;
 when you switch one on, sign in once by hand and keep its local login until that works.
 
-## A tool without a login: oauth2-proxy behind Caddy
+## A tool without a login: the gate (oauth2-proxy behind Caddy)
 
-oauth2-proxy (MIT) as one extra container, `forward_auth` in Caddy for each tool's site:
+The `gate` profile (component `gate` in config/components.json, `pnpm run infra -- add gate`) runs
+oauth2-proxy (MIT) as the `gate` service. Caddy asks it on every request to a gated site
+(`forward_auth`); without a valid cookie the visitor is sent to `GATE_PUBLIC_URL` (e.g.
+`https://auth.app.example.com`), signs in with the app, and comes back. The token request is
+refused for anyone who is not an operator with two-factor (above), and oauth2-proxy also requires
+the `operators` group, so only operators get through. One callback for every gated site
+(`SSO_OAUTH2_PROXY_REDIRECT_URIS` = `GATE_PUBLIC_URL` + `/oauth2/callback`); the cookie is set
+for `.APP_DOMAIN`, so the gated sites are subdomains of the app's domain.
 
-```
-oauth2-proxy --provider=oidc --oidc-issuer-url=https://app.example.com/api/auth \
-  --client-id=oauth2-proxy --client-secret=$SSO_OAUTH2_PROXY_SECRET \
-  --redirect-url=https://tools.example.com/oauth2/callback --email-domain='*' \
-  --allowed-group=operators --oidc-groups-claim=groups --scope='openid email profile groups' \
-  --cookie-secret=<32 random bytes> --cookie-domain=.example.com --reverse-proxy --set-xauthrequest
-```
-
-```
-prometheus.example.com {
-	handle /oauth2/* {
-		reverse_proxy oauth2-proxy:4180
-	}
-	handle {
-		forward_auth oauth2-proxy:4180 {
-			uri /oauth2/auth
-			copy_headers X-Auth-Request-User X-Auth-Request-Email
-			@unauth status 401
-			handle_response @unauth {
-				redir * /oauth2/sign_in?rd={scheme}://{host}{uri}
-			}
-		}
-		reverse_proxy prometheus:9090
-	}
-}
-```
-
-Register `SSO_OAUTH2_PROXY_REDIRECT_URIS` with every callback host you use.
+Gate a site: put `import gated <service>:<port>` in its `deploy/sites/<profile>.caddy` (the
+snippet is in `deploy/Caddyfile`), and give the component `"requires": {"install":
+["gate:install"]}`. The app builders (docs/app-builders.md) use it. A tool on another host can use
+the same gate by hand: point its Caddy `forward_auth` at this host's gate the same way.
 
 ## Test it
 

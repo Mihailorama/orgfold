@@ -1,0 +1,6 @@
+# Profile bolt (bolt.diy, app builder, docs/app-builders.md): BOLT_PUBLIC_URL=https://bolt.example.com.
+# Operators only: the gate (profile gate) signs them in with the app. WebContainers need the
+# page cross-origin isolated; bolt.diy sends those headers itself.
+{$BOLT_PUBLIC_URL} {
+	import gated bolt:5173
+}

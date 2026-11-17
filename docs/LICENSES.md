@@ -40,6 +40,9 @@ on an image that is not. Their primary software licenses:
 | `twentycrm/twenty`                                 | CRM: people, companies, deals (`crm` profile)                  | AGPL-3.0 + app exception    |
 | `caldiy` (built from calcom/cal.diy)               | booking: "Book a demo" (`booking` profile)                     | MIT                         |
 | `vaultwarden/server`                               | secrets vault for humans and agents (`vault` profile)          | AGPL-3.0                    |
+| `quay.io/oauth2-proxy/oauth2-proxy`                | staff sign-in gate for tools without a login (`gate` profile)  | MIT                         |
+| `ghcr.io/openhands/agent-canvas`                   | app builder: coding agents in a sandbox (`openhands` profile)  | MIT                         |
+| `ghcr.io/stackblitz-labs/bolt.diy`                 | app builder in the browser (`bolt` profile)                    | MIT (+ WebContainers terms) |
 | `stripe/stripe-mock`                               | Stripe API mock for tests/dev (`billing` profile)              | MIT                         |
 | `node` + `@modelcontextprotocol/server-everything` | reference MCP server, run unmodified via `npx` (`mcp` profile) | MIT / Apache-2.0            |
 | `vllm/vllm-openai`                                 | self-hosted models, GPU (`local-llm` profile)                  | Apache-2.0                  |
@@ -236,6 +239,19 @@ Notes:
     `calcom/cal.com` image, v6.2.0 (2026-03-02, AGPL-3.0 with a commercial `ee/`), is unmaintained
     and not used. Cal.com Cloud, the documented alternative, is an external service. The web and
     the site load the booking host's `embed.js` by URL after consent: no npm dependency.
+- App builders and their gate ([docs/app-builders.md](app-builders.md), [docs/sso.md](sso.md)),
+  checked 2026-11-17, all run unmodified:
+  - `quay.io/oauth2-proxy/oauth2-proxy` (v7.15.5, `gate` profile): MIT
+    ([LICENSE](https://github.com/oauth2-proxy/oauth2-proxy/blob/master/LICENSE)).
+  - `ghcr.io/openhands/agent-canvas` (1.38.0, `openhands` profile): the
+    [OpenHands/OpenHands](https://github.com/OpenHands/OpenHands/blob/main/LICENSE) repository is MIT.
+  - `ghcr.io/stackblitz-labs/bolt.diy` (v1.0.3, `bolt` profile): MIT
+    ([LICENSE](https://github.com/stackblitz-labs/bolt.diy/blob/main/LICENSE)). It runs the apps it
+    builds with StackBlitz's WebContainer API in the visitor's browser; its README points to
+    [webcontainers.io/enterprise](https://webcontainers.io/enterprise), which says production use
+    in a commercial, for-profit setting (including for employees) needs a commercial license, and
+    prototypes do not. That is a term of StackBlitz's service, not of the image: the catalog says
+    it where the owner picks bolt.diy.
 - Secrets vault ([docs/secrets.md](secrets.md), ADR 0029), checked 2026-11-08:
   - `vaultwarden/server` (Vaultwarden 1.37.5, `vault` profile): its
     [LICENSE.txt](https://github.com/dani-garcia/vaultwarden/blob/main/LICENSE.txt) is the GNU
