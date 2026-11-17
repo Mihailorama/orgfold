@@ -751,6 +751,23 @@ export function checkPlan(plan, stackModes) {
   return Object.keys(fixed).length ? fixed : 'the plan has no actions';
 }
 
+/**
+ * Values entered in the Stack page's connect cards: secrets join the run's secrets (never the
+ * answers file), plain values replace saved answers. INFRA_<KEY> and --secrets-stdin still win.
+ */
+export function takeEntered(a, secrets, entered) {
+  for (const [id, values] of Object.entries(entered ?? {})) {
+    const c = byId[id];
+    if (!c || a.components[id]?.mode !== 'connect') continue;
+    for (const f of fields(c, a.components[id])) {
+      const v = values[f.key];
+      if (v === undefined) continue;
+      if (f.secret) secrets[f.key] ??= v;
+      else a.components[id][f.key] = v;
+    }
+  }
+}
+
 /** Reads a plan from the server's database through the API container (SSH is the authorization). */
 function stackPlan(env, id, verb) {
   const r = ssh(
@@ -822,12 +839,14 @@ async function main() {
   }
   let fixed;
   if (planId) {
-    fixed = checkPlan(stackPlan(current, planId, 'get'), current.STACK_MODES);
+    const got = stackPlan(current, planId, 'get');
+    fixed = checkPlan(got, current.STACK_MODES);
     if (typeof fixed === 'string') die(`plan ${planId}: ${fixed}`);
     for (const [id, mode] of Object.entries(fixed)) {
       a.components[id] ??= {};
       a.components[id].mode = mode;
     }
+    takeEntered(a, secrets, got.connect);
   }
   const confirm = interactive ? await ask(a, current, secrets, only, fixed) : undefined;
   const errors = validateAnswers(a);

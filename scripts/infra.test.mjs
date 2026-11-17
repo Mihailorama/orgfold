@@ -16,6 +16,7 @@ import {
   render,
   rotateErrors,
   summary,
+  takeEntered,
   validateAnswers,
 } from './infra.mjs';
 
@@ -322,6 +323,24 @@ test('a plan from the Stack page runs only approved, for the same stack, catalog
     assert.match(checkPlan(plan({ actions: [action] }), modes), /outside the catalog/);
   }
   assert.match(checkPlan(plan({ actions: [] }), modes), /no actions/);
+});
+
+test("values from the Stack page's connect card: secrets stay out of the answers", () => {
+  const a = answers();
+  a.components.crm = { mode: 'connect', TWENTY_API_URL: 'https://old.example.com' };
+  const secrets = {};
+  const entered = {
+    crm: { TWENTY_API_URL: 'https://crm.example.com', TWENTY_API_KEY: 'local-dev-key' },
+    analytics: { POSTHOG_KEY: 'phc_x' }, // not connected by this plan: ignored
+  };
+  takeEntered(a, secrets, entered);
+  assert.equal(a.components.crm.TWENTY_API_URL, 'https://crm.example.com');
+  assert.equal(a.components.crm.TWENTY_API_KEY, undefined);
+  assert.deepEqual(secrets, { TWENTY_API_KEY: 'local-dev-key' });
+  assert.deepEqual(validateAnswers(a), []);
+  const passed = { TWENTY_API_KEY: 'from-env' }; // INFRA_TWENTY_API_KEY wins
+  takeEntered(a, passed, entered);
+  assert.equal(passed.TWENTY_API_KEY, 'from-env');
 });
 
 test('the receipt lists what is installed with addresses, then connected and skipped', () => {

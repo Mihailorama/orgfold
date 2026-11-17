@@ -253,6 +253,66 @@ describe('stack (docs/admin.md "Stack")', () => {
     ]);
   });
 
+  it('adds from the catalog without the agent; the connect card seals keys; no keys to the agent', async () => {
+    const { openSecret } = await import('../src/webhook-secret.ts');
+    // A key in a request would reach the model: refused before any plan is made.
+    const leak = await post(op, '/api/admin/stack/plans', {
+      request: 'Connect our Twenty, key sk-proj-abcdefghijklmnopqrstu',
+    });
+    expect(leak.statusCode).toBe(400);
+    expect(leak.json().error).toMatch(/connect card/);
+    for (const bad of [
+      { component: 'core', mode: 'skip' },
+      { component: 'crm', mode: 'nope' },
+      { component: 'nope', mode: 'install' },
+    ]) {
+      expect((await post(op, '/api/admin/stack/plans', bad)).statusCode).toBe(400);
+    }
+    const made = await post(op, '/api/admin/stack/plans', { component: 'crm', mode: 'connect' });
+    expect(made.statusCode).toBe(201);
+    const plan = made.json() as { id: string };
+    expect(plan).toMatchObject({
+      status: 'ready',
+      request: 'Connect CRM (Twenty)',
+      actions: [
+        {
+          component: 'crm',
+          mode: 'connect',
+          fields: [
+            { key: 'TWENTY_API_URL', secret: false, entered: null },
+            { key: 'TWENTY_API_KEY', secret: true, entered: null },
+          ],
+        },
+      ],
+    });
+    const enter = (values: object, component = 'crm') =>
+      call(op, 'PUT', `/api/admin/stack/plans/${plan.id}/connect/${component}`, { values });
+    expect(
+      (await call(owner, 'PUT', `/api/admin/stack/plans/${plan.id}/connect/crm`, { values: {} }))
+        .statusCode,
+    ).toBe(403);
+    expect((await enter({ TWENTY_API_URL: 'http://plain.example.com' })).statusCode).toBe(400);
+    expect((await enter({ NOPE: 'x' })).statusCode).toBe(400);
+    expect((await enter({ POSTHOG_KEY: 'phc_x' }, 'analytics')).statusCode).toBe(400);
+    const ok = await enter({
+      TWENTY_API_URL: 'https://crm.example.com',
+      TWENTY_API_KEY: 'local-dev-twenty-key',
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(JSON.stringify(ok.json())).not.toContain('local-dev-twenty-key');
+    expect(ok.json().actions[0].fields.map((f: { entered: string }) => f.entered)).toEqual([
+      'https://crm.example.com',
+      '…-key',
+    ]);
+    const [row] = await db.select().from(stackPlans).where(eq(stackPlans.id, plan.id));
+    const cipher = row?.connect?.crm?.TWENTY_API_KEY?.cipher ?? '';
+    expect(cipher).toMatch(/^v1:/);
+    expect(openSecret(cipher, `stack-plan/${plan.id}/crm/TWENTY_API_KEY`)).toBe(
+      'local-dev-twenty-key',
+    );
+    expect(() => openSecret(cipher, `stack-plan/${plan.id}/crm/OTHER`)).toThrow();
+  });
+
   it("connects the agents' model: offered pairs only, key sealed, recent sign-in, audited", async () => {
     await db.delete(platformAi);
     expect((await get(owner, '/api/admin/ai')).statusCode).toBe(403);

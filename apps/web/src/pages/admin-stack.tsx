@@ -21,6 +21,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api';
 import { authClient } from '@/lib/auth';
@@ -48,9 +50,17 @@ type Plan = {
   request: string;
   status: 'drafting' | 'ready' | 'failed' | 'off' | 'approved' | 'applied';
   reply: string | null;
-  actions: { component: string; mode: Mode }[];
+  actions: { component: string; mode: Mode; fields: Field[] }[];
   current: boolean;
   createdAt: string;
+};
+/** What a `connect` asks for; `entered` is the saved value, or a secret's last 4 characters. */
+type Field = {
+  key: string;
+  label: string;
+  secret: boolean;
+  default: string | null;
+  entered: string | null;
 };
 type Stack = {
   profile: { name: string; address: string; mailFrom: string | null };
@@ -168,7 +178,7 @@ function StackBody({ stack }: { stack: Stack }) {
       </Section>
 
       <ModelBlock />
-      {stack.reported && <PlanSection titleOf={titleOf} />}
+      {stack.reported && <PlanSection components={stack.components} />}
 
       {stack.reported &&
         GROUPS.map(([g, label]) => {
@@ -178,7 +188,7 @@ function StackBody({ stack }: { stack: Stack }) {
               <h2 id={`stack-${g}`} className="text-lg font-semibold">
                 {label}
               </h2>
-              <Rows rows={rows} titleOf={titleOf} />
+              <Rows rows={rows} titleOf={titleOf} reported={stack.reported} />
             </section>
           ) : null;
         })}
@@ -193,7 +203,7 @@ function StackBody({ stack }: { stack: Stack }) {
               Install a tool on this server, or connect the one the company already uses.
             </p>
           </div>
-          <Rows rows={free} titleOf={titleOf} />
+          <Rows rows={free} titleOf={titleOf} reported={stack.reported} />
         </section>
       )}
     </>
@@ -209,28 +219,36 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Rows({ rows, titleOf }: { rows: Component[]; titleOf: (id: string) => string }) {
+type RowProps = { titleOf: (id: string) => string; reported: boolean };
+
+function Rows({ rows, ...props }: RowProps & { rows: Component[] }) {
   return (
     <Card className="py-0">
       <CardContent className="divide-y px-0">
         {rows.map((c) => (
-          <Row key={c.id} c={c} titleOf={titleOf} />
+          <Row key={c.id} c={c} {...props} />
         ))}
       </CardContent>
     </Card>
   );
 }
 
-function Row({ c, titleOf }: { c: Component; titleOf: (id: string) => string }) {
+function Mark({ title }: { title: string }) {
+  return (
+    <div
+      className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground"
+      aria-hidden
+    >
+      {title.slice(0, 2)}
+    </div>
+  );
+}
+
+function Row({ c, ...props }: RowProps & { c: Component }) {
   const used = inUse(c);
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3">
-      <div
-        className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground"
-        aria-hidden
-      >
-        {c.title.slice(0, 2)}
-      </div>
+      <Mark title={c.title} />
       <div className="min-w-0 flex-1 basis-56 space-y-0.5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{c.title}</span>
@@ -247,7 +265,7 @@ function Row({ c, titleOf }: { c: Component; titleOf: (id: string) => string }) 
             </a>
           </Button>
         )}
-        {c.id !== 'core' && <ChangeDialog c={c} titleOf={titleOf} />}
+        {c.id !== 'core' && <ChangeDialog c={c} {...props} />}
       </div>
     </div>
   );
@@ -263,9 +281,26 @@ function StatusDot({ status }: { status: Status }) {
   );
 }
 
-function ChangeDialog({ c, titleOf }: { c: Component; titleOf: (id: string) => string }) {
+function ChangeDialog({ c, titleOf, reported }: RowProps & { c: Component }) {
   const used = inUse(c);
+  const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
   const command = `pnpm run infra -- add ${c.id}`;
+  // One click makes a plan without the agent (like a marketplace's Install); it waits under "Plan
+  // a change" for its connect card and approval, as the agent's plans do.
+  const add = useMutation({
+    mutationFn: (mode: Mode) =>
+      api<Plan>('/api/admin/stack/plans', { method: 'POST', json: { component: c.id, mode } }),
+    onSuccess: async () => {
+      setOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'stack', 'plans'] });
+      toast('Plan made: see Plan a change');
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  // The base (database, S3, mail) changes only through `pnpm run infra` itself.
+  const choices =
+    c.group === 'base' ? [] : c.modes.filter((m) => m !== c.mode && (m !== 'skip' || used));
   const needs = (c.requires.install ?? []).map((r) => titleOf(r.split(':')[0] ?? r));
   const ways = c.modes.flatMap((m) => {
     if (m === 'install')
@@ -279,7 +314,7 @@ function ChangeDialog({ c, titleOf }: { c: Component; titleOf: (id: string) => s
   });
 
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant={used ? 'outline' : 'default'} size="sm">
           {used ? 'Change' : 'Add'}
@@ -292,7 +327,7 @@ function ChangeDialog({ c, titleOf }: { c: Component; titleOf: (id: string) => s
           </DialogTitle>
           <DialogDescription>
             Changes to the servers run from the machine you set them up from, so no one can change
-            them from this page.
+            them from this page. A plan made here waits for your approval and that run.
           </DialogDescription>
         </DialogHeader>
         <ul className="list-disc space-y-1 pl-5 text-sm">
@@ -300,8 +335,23 @@ function ChangeDialog({ c, titleOf }: { c: Component; titleOf: (id: string) => s
             <li key={w}>{w}</li>
           ))}
         </ul>
+        {reported && choices.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {choices.map((m) => (
+              <Button
+                key={m}
+                size="sm"
+                variant={m === 'skip' ? 'outline' : 'default'}
+                disabled={add.isPending}
+                onClick={() => add.mutate(m)}
+              >
+                {VERB[m]}
+              </Button>
+            ))}
+          </div>
+        )}
         <div className="space-y-2">
-          <p className="text-sm">Run there:</p>
+          <p className="text-sm">{reported ? 'Or run on that machine:' : 'Run there:'}</p>
           <Command command={command} />
           <p className="text-sm text-muted-foreground">
             It asks how, shows the plan with the memory it needs, and changes nothing until you
@@ -354,7 +404,8 @@ function ModelBlock() {
   return ai.data ? <ModelSection ai={ai.data} /> : null;
 }
 
-function PlanSection({ titleOf }: { titleOf: (id: string) => string }) {
+function PlanSection({ components }: { components: Component[] }) {
+  const byId = new Map(components.map((c) => [c.id, c]));
   const queryClient = useQueryClient();
   const [request, setRequest] = useState('');
   const plans = useQuery({
@@ -402,7 +453,7 @@ function PlanSection({ titleOf }: { titleOf: (id: string) => string }) {
         {plans.data?.length ? (
           <ul className="divide-y" aria-label="Plans">
             {plans.data.map((p) => (
-              <PlanItem key={p.id} plan={p} titleOf={titleOf} onDone={refresh} />
+              <PlanItem key={p.id} plan={p} byId={byId} onDone={refresh} />
             ))}
           </ul>
         ) : null}
@@ -413,11 +464,11 @@ function PlanSection({ titleOf }: { titleOf: (id: string) => string }) {
 
 function PlanItem({
   plan,
-  titleOf,
+  byId,
   onDone,
 }: {
   plan: Plan;
-  titleOf: (id: string) => string;
+  byId: Map<string, Component>;
   onDone: () => Promise<unknown>;
 }) {
   const navigate = useNavigate();
@@ -439,11 +490,16 @@ function PlanItem({
       </div>
       {plan.reply && <p className="text-sm text-muted-foreground">{plan.reply}</p>}
       {plan.actions.length > 0 && (
-        <ol className="list-decimal space-y-1 pl-5 text-sm">
+        <ol className="space-y-2" aria-label="Actions">
           {plan.actions.map((a) => (
-            <li key={a.component}>
-              {VERB[a.mode]}: {titleOf(a.component)}
-            </li>
+            <ActionCard
+              key={a.component}
+              action={a}
+              c={byId.get(a.component)}
+              planId={plan.id}
+              editable={open && plan.current}
+              onDone={onDone}
+            />
           ))}
         </ol>
       )}
@@ -477,12 +533,133 @@ function PlanItem({
       {plan.status === 'approved' && plan.current && (
         <div className="space-y-2">
           <p className="text-sm">
-            Run it from the machine you set up the servers from. It shows what changes, asks for any
-            address or key, and runs the plan once:
+            Run it from the machine you set up the servers from. It takes what you entered above,
+            asks for anything missing, shows what changes and runs the plan once:
           </p>
           <Command command={`pnpm run infra -- apply ${plan.id}`} />
         </div>
       )}
     </li>
+  );
+}
+
+/**
+ * One action of a plan, as a card. A `connect` card takes the address and keys right here (as
+ * Lovable's and v0's chats ask for a secret): they go to the API, never to the agent, secrets are
+ * encrypted at once and shown again only as their last 4 characters.
+ */
+function ActionCard({
+  action,
+  c,
+  planId,
+  editable,
+  onDone,
+}: {
+  action: Plan['actions'][number];
+  c: Component | undefined;
+  planId: string;
+  editable: boolean;
+  onDone: () => Promise<unknown>;
+}) {
+  const title = c?.title ?? action.component;
+  const missing = action.fields.filter((f) => !f.entered && !f.default).length;
+  return (
+    <li className="space-y-3 rounded-md border p-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <Mark title={title} />
+        <div className="min-w-0 flex-1 basis-48 space-y-0.5">
+          <div className="font-medium">{title}</div>
+          <p className="text-sm text-muted-foreground">
+            {VERB[action.mode]}
+            {action.mode === 'install' && c?.ramMiB ? `, reserves ${gib(c.ramMiB)} of memory` : ''}
+          </p>
+        </div>
+        {action.fields.length > 0 && (
+          <Badge variant={missing ? 'outline' : 'secondary'}>
+            {missing ? `${missing} to enter` : 'Ready to connect'}
+          </Badge>
+        )}
+      </div>
+      {action.fields.length > 0 &&
+        (editable ? (
+          <ConnectForm action={action} title={title} planId={planId} onDone={onDone} />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {action.fields.map((f) => f.label).join('; ')}
+          </p>
+        ))}
+    </li>
+  );
+}
+
+function ConnectForm({
+  action,
+  title,
+  planId,
+  onDone,
+}: {
+  action: Plan['actions'][number];
+  title: string;
+  planId: string;
+  onDone: () => Promise<unknown>;
+}) {
+  const [values, setValues] = useState<Record<string, string>>({});
+  const save = useMutation({
+    mutationFn: () =>
+      api<Plan>(`/api/admin/stack/plans/${planId}/connect/${action.component}`, {
+        method: 'PUT',
+        json: { values: Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim())) },
+      }),
+    onSuccess: async () => {
+      setValues({});
+      await onDone();
+      toast('Saved. Keys are encrypted and never shown again.');
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  return (
+    <form
+      className="space-y-3"
+      aria-label={`Connect ${title}`}
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate();
+      }}
+    >
+      {action.fields.map((f) => {
+        const id = `connect-${planId}-${f.key}`;
+        return (
+          <div key={f.key} className="space-y-1">
+            <Label htmlFor={id}>{f.label}</Label>
+            <Input
+              id={id}
+              type={f.secret ? 'password' : 'text'}
+              autoComplete="off"
+              value={values[f.key] ?? ''}
+              onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
+              placeholder={
+                f.entered
+                  ? f.secret
+                    ? `Saved, ends in ${f.entered.slice(1)}`
+                    : f.entered
+                  : (f.default ?? '')
+              }
+            />
+          </div>
+        );
+      })}
+      <p className="text-sm text-muted-foreground">
+        Sent to this server only, not to the agent. Keys are encrypted and used once, when the plan
+        runs.
+      </p>
+      <Button
+        type="submit"
+        size="sm"
+        variant="outline"
+        disabled={save.isPending || !Object.values(values).some((v) => v.trim())}
+      >
+        Save
+      </Button>
+    </form>
   );
 }

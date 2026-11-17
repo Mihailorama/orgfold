@@ -64,8 +64,10 @@ the account's role to `user`.
   On-box tools are reached at their public address from the API container, so the server must
   reach its own public IP (true on ordinary VPS hosts); "Open" is offered for those tools. The company block shows `APP_NAME`, the app's address and `MAIL_FROM`. How each component
   runs comes from `STACK_MODES`, which `pnpm run infra` writes (no secrets); a server set up
-  before it was added shows a note to run setup (which also deploys the newest release). The page changes nothing: "Add" and
-  "Change" give the `pnpm run infra -- add <id>` command, which shows a plan and asks first
+  before it was added shows a note to run setup (which also deploys the newest release). The page changes nothing on the servers:
+  "Add" and "Change" offer each mode as a button ("Install on this server", "Connect the existing
+  one", "Remove from the stack"), which makes a ready plan of that one action without the agent
+  (like a marketplace's Install), and the `pnpm run infra -- add <id>` command as the other way
   (SAASSTARTER-98).
 - **Stack, Plan a change**: the operator writes what the company needs; the planning agent
   (purpose `stack.plan`, docs/ai/stack.plan.md, worker/stack.py) answers with a reply and a plan
@@ -75,8 +77,17 @@ the account's role to `user`.
   and TOTP) and the stack the plan was made for (`STACK_MODES` unchanged since), and writes
   `operator.stack_plan.approved`. Then `pnpm run infra -- apply <id>` on the admin's machine reads
   the plan over SSH (`apps/api/src/stack-plan.ts` in the API container: SSH is the authorization),
-  checks the same three things again (a re-run after a failed apply resumes the same plan), asks for any address or key a `connect` needs, shows the
-  infrastructure plan, applies it once and marks it applied. Plans are `stack_plans` rows (not
+  checks the same three things again (a re-run after a failed apply resumes the same plan), asks for any address or key a `connect` still needs, shows the
+  infrastructure plan, applies it once and marks it applied.
+  Each action is a card; a `connect` card takes its address and keys on the page (the catalog's
+  `connect` fields, except the model's own), the way Lovable and v0 ask for a secret in their
+  chats: `PUT /api/admin/stack/plans/:id/connect/:component` (audited
+  `operator.stack_plan.connect_entered`) stores plain values and encrypts secrets at once
+  (WEBHOOK_ENCRYPTION_KEYS, bound to plan, component and field), and the page shows only a
+  secret's last 4 characters. They never reach the agent, and a request that looks like it carries
+  a key (known key shapes, a URL with a password) is refused before it does. Apply takes them
+  (secrets join the run's secrets, never the answers file; `INFRA_<KEY>` still wins) and clears
+  them when it marks the plan applied. Plans are `stack_plans` rows (not
   tenant data). It thinks with the model connected on the console's first step (below), or the one
   `AI_STACK_PLAN_*` name; without one it answers "Agent off". Its AI calls are audited under
   `STACK_AI_ORG_ID`, or an "Operator console" organization the worker makes on first use.
