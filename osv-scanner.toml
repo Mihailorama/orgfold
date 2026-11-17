@@ -7,3 +7,11 @@ reason = """@opentelemetry/core 1.x is pulled in by @temporalio/interceptors-ope
 workflow-sandbox span exporter only; the API imports the client interceptor, which never loads it. \
 Global propagators come from @opentelemetry/sdk-node (core 2.x, fixed). Drop when Temporal's \
 package moves to OpenTelemetry 2.x."""
+
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf"
+ignoreUntil = 2027-02-01
+reason = """picomatch ReDoS on crafted extglob patterns, no fixed version yet. It runs only in build \
+and test tools (Astro, Vite, Vitest, tinyglobby) on glob patterns from our own config, never on \
+input from users; the API reaches it only through better-auth's vitest peer, never loaded at runtime. \
+Drop when a fixed picomatch is released and the lockfile picks it up."""
