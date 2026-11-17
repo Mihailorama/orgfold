@@ -75,7 +75,21 @@
       "verify": {
         "install": "docker compose exec -T postgres pg_isready -q -U postgres -d app"
       },
-      "group": "base"
+      "group": "base",
+      "offers": [
+        {
+          "name": "Neon",
+          "url": "https://neon.com/pricing",
+          "free": "free: 1 GB per project, no card, pgvector; sleeps after 5 minutes idle",
+          "checked": "2026-11-17"
+        },
+        {
+          "name": "Supabase",
+          "url": "https://supabase.com/pricing",
+          "free": "free: 500 MB database; pauses after a week without activity",
+          "checked": "2026-11-17"
+        }
+      ]
     },
     {
       "id": "s3",
@@ -141,7 +155,21 @@
         }
       ],
       "verify": "docker compose exec -T worker python -m worker.selfcheck s3",
-      "group": "base"
+      "group": "base",
+      "offers": [
+        {
+          "name": "Cloudflare R2",
+          "url": "https://developers.cloudflare.com/r2/pricing/",
+          "free": "free: 10 GB stored a month, no egress fees",
+          "checked": "2026-11-17"
+        },
+        {
+          "name": "Backblaze B2",
+          "url": "https://www.backblaze.com/cloud-storage/pricing",
+          "free": "first 10 GB free, then about $7 per TB a month",
+          "checked": "2026-11-17"
+        }
+      ]
     },
     {
       "id": "smtp",
@@ -164,7 +192,27 @@
         }
       ],
       "verify": "docker compose exec -T worker python -m worker.selfcheck smtp",
-      "group": "base"
+      "group": "base",
+      "offers": [
+        {
+          "name": "Brevo",
+          "url": "https://www.brevo.com/pricing",
+          "free": "free: 300 emails a day, after account approval",
+          "checked": "2026-11-17"
+        },
+        {
+          "name": "Mailjet",
+          "url": "https://www.mailjet.com/pricing/",
+          "free": "free: 6,000 emails a month, 200 a day",
+          "checked": "2026-11-17"
+        },
+        {
+          "name": "SMTP2GO",
+          "url": "https://www.smtp2go.com/pricing/",
+          "free": "free: 1,000 emails a month",
+          "checked": "2026-11-17"
+        }
+      ]
     },
     {
       "id": "analytics",
@@ -206,7 +254,15 @@
       },
       "requires": {
         "install": ["postgres:install"]
-      }
+      },
+      "offers": [
+        {
+          "name": "PostHog Cloud",
+          "url": "https://posthog.com/pricing",
+          "free": "free: 1M events a month, no card; EU or US",
+          "checked": "2026-11-17"
+        }
+      ]
     },
     {
       "id": "llm",
@@ -281,7 +337,15 @@
       ],
       "verify": {
         "install": "docker compose exec -T vault curl -fsS -o /dev/null http://127.0.0.1:80/alive"
-      }
+      },
+      "offers": [
+        {
+          "name": "Bitwarden",
+          "url": "https://bitwarden.com/pricing/",
+          "free": "free organization for 2 people; Families $3.99 a month for up to 6, billed yearly",
+          "checked": "2026-11-17"
+        }
+      ]
     },
     {
       "id": "backups",
@@ -421,7 +485,15 @@
       "keys": ["TWENTY_API_KEY", "CRM_FILE"],
       "verify": {
         "install": "docker compose exec -T twenty curl -fsS -o /dev/null http://localhost:3000/healthz"
-      }
+      },
+      "offers": [
+        {
+          "name": "Twenty Cloud",
+          "url": "https://www.twenty.com/pricing",
+          "free": "no free plan: from $9 per user a month, billed yearly; free trial",
+          "checked": "2026-11-17"
+        }
+      ]
     },
     {
       "id": "billing",

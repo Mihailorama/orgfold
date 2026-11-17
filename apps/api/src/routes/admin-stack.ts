@@ -10,6 +10,7 @@ import { REAUTH_MAX_AGE_SECONDS } from '../mfa.ts';
 import { s3Reachable } from '../s3.ts';
 import { startStackPlan } from '../temporal.ts';
 import { httpError } from '../tenant.ts';
+import { encryptSecret } from '../webhook-secret.ts';
 import {
   auditPlatform,
   ErrorBody,
@@ -25,6 +26,13 @@ import {
  * go through `pnpm run infra` on the admin's machine, which also writes STACK_MODES.
  */
 
+/** A service to connect with a free or cheap tier (config/components.json `offers`). */
+const Offer = z.object({
+  name: z.string(),
+  url: z.string(),
+  free: z.string(),
+  checked: z.string(),
+});
 type Catalog = {
   components: {
     id: string;
@@ -36,6 +44,14 @@ type Catalog = {
     available?: boolean;
     install?: { ramMiB?: number; site?: string };
     requires?: Record<string, string[]>;
+    connect?: {
+      key: string;
+      prompt: string;
+      secret?: boolean;
+      default?: string;
+      validate?: string;
+    }[];
+    offers?: z.infer<typeof Offer>[];
   }[];
 };
 const catalog = (
@@ -45,6 +61,58 @@ const catalog = (
 ).components.filter((c) => c.available !== false);
 
 const Mode = z.enum(['install', 'connect', 'skip']);
+
+/**
+ * The address and keys a `connect` asks for, entered on the page (the chat's connect card, as in
+ * Lovable or v0) instead of at `infra apply`. Not for the model's own fields (`@apiKey`, AI_*):
+ * those depend on each other and are connected on "Connect a model".
+ */
+const connectFields = (id: string) => {
+  const fields = catalog.find((c) => c.id === id)?.connect ?? [];
+  return fields.some((f) => f.key.startsWith('@') || f.key.startsWith('AI_')) ? [] : fields;
+};
+type Entered = NonNullable<typeof stackPlans.$inferSelect.connect>;
+const Field = z.object({
+  key: z.string(),
+  label: z.string(),
+  secret: z.boolean(),
+  default: z.string().nullable(),
+  /** Entered already: the plain value, or a secret's last 4 characters. */
+  entered: z.string().nullable(),
+});
+const Action = z.object({
+  component: z.string(),
+  mode: Mode,
+  fields: z.array(Field),
+  offers: z.array(Offer),
+});
+const offersOf = (id: string) => catalog.find((c) => c.id === id)?.offers ?? [];
+const toActions = (actions: { component: string; mode: string }[], entered: Entered) =>
+  actions.map((a) => ({
+    component: a.component,
+    mode: a.mode as z.infer<typeof Mode>,
+    fields:
+      a.mode === 'connect'
+        ? connectFields(a.component).map((f) => {
+            const e = entered[a.component]?.[f.key];
+            return {
+              key: f.key,
+              label: f.prompt,
+              secret: Boolean(f.secret),
+              default: f.default ?? null,
+              entered: (f.secret ? e?.hint && `…${e.hint}` : e?.value) || null,
+            };
+          })
+        : [],
+    offers: a.mode === 'connect' ? offersOf(a.component) : [],
+  }));
+
+/**
+ * Keys never go to the agent (its request is the model's input): a request that looks like it
+ * carries one is refused, and the page points to the connect card. Known key shapes only.
+ */
+const KEY_LIKE =
+  /\b(sk-[\w-]{16,}|sk_(live|test)_\w{10,}|(ghp|gho|github_pat)_\w{20,}|xox[abpr]-[\w-]{10,}|AKIA[0-9A-Z]{16}|eyJ[\w-]{10,}\.[\w-]{10,}\.)|\b[a-zA-Z][\w+.-]{1,15}:\/\/[^\s/:@]{1,256}:[^\s/@]{1,256}@/;
 const Status = z.enum(['up', 'down', 'unchecked']);
 const Component = z.object({
   id: z.string(),
@@ -57,6 +125,7 @@ const Component = z.object({
   ramMiB: z.number().nullable(),
   requires: z.record(z.string(), z.array(z.string())),
   status: Status,
+  offers: z.array(Offer),
 });
 const Stack = z.object({
   profile: z.object({ name: z.string(), address: z.string(), mailFrom: z.string().nullable() }),
@@ -71,7 +140,7 @@ const Plan = z.object({
   request: z.string(),
   status: z.enum(['drafting', 'ready', 'failed', 'off', 'approved', 'applied']),
   reply: z.string().nullable(),
-  actions: z.array(z.object({ component: z.string(), mode: Mode })),
+  actions: z.array(Action),
   /** Made for the stack as it is now; false = it changed since, the plan cannot be approved. */
   current: z.boolean(),
   createdAt: z.string(),
@@ -84,7 +153,7 @@ const toPlan = (p: PlanRow): z.infer<typeof Plan> => ({
   request: p.request,
   status: p.status as z.infer<typeof Plan>['status'],
   reply: p.reply,
-  actions: (p.actions ?? []) as z.infer<typeof Plan>['actions'],
+  actions: toActions(p.actions ?? [], p.connect ?? {}),
   current: p.stackVersion === stackVersion(),
   createdAt: iso(p.createdAt) ?? '',
   approvedAt: iso(p.approvedAt),
@@ -165,6 +234,7 @@ export const adminStackRoutes: FastifyPluginAsyncZod<{ redis: Redis }> = async (
             url,
             ramMiB: c.install?.ramMiB ?? null,
             requires: c.requires ?? {},
+            offers: c.offers ?? [],
             status: await check(redis, c.id, mode, url),
           };
         }),
@@ -203,21 +273,49 @@ export const adminStackRoutes: FastifyPluginAsyncZod<{ redis: Redis }> = async (
       schema: {
         tags: ['admin'],
         hide: true,
-        body: z.object({ request: z.string().trim().min(3).max(2000) }),
-        response: { 201: Plan, 409: ErrorBody },
+        // A request for the agent, or one catalog action picked on the page (no agent).
+        body: z.union([
+          z.object({ request: z.string().trim().min(3).max(2000) }),
+          z.object({ component: z.string(), mode: Mode }),
+        ]),
+        response: { 201: Plan, 400: ErrorBody, 409: ErrorBody },
       },
     },
     async (req, reply) => {
       if (!stackVersion()) {
         throw httpError(409, 'this server has not reported its components yet (Stack page)');
       }
+      const base = { stackVersion: stackVersion(), createdBy: req.operator.id };
+      if ('component' in req.body) {
+        const { component, mode } = req.body;
+        const c = catalog.find((x) => x.id === component);
+        if (!c || c.tier === 'core' || !c.modes.includes(mode)) {
+          throw httpError(400, 'not an action of the catalog');
+        }
+        if ((parseModes(stackVersion()).get(component) ?? 'skip') === mode) {
+          throw httpError(409, 'it already runs that way');
+        }
+        const [row] = await db
+          .insert(stackPlans)
+          .values({
+            ...base,
+            request: `${mode === 'install' ? 'Install' : mode === 'connect' ? 'Connect' : 'Remove'} ${c.title}`,
+            status: 'ready',
+            actions: [{ component, mode }],
+          })
+          .returning();
+        if (!row) throw new Error('insert returned no row');
+        return reply.code(201).send(toPlan(row));
+      }
+      if (KEY_LIKE.test(req.body.request)) {
+        throw httpError(
+          400,
+          "this looks like a key or password, and requests go to the agent: leave it out, and enter it in the plan's connect card",
+        );
+      }
       const [row] = await db
         .insert(stackPlans)
-        .values({
-          request: req.body.request,
-          stackVersion: stackVersion(),
-          createdBy: req.operator.id,
-        })
+        .values({ ...base, request: req.body.request })
         .returning();
       if (!row) throw new Error('insert returned no row');
       try {
@@ -264,6 +362,71 @@ export const adminStackRoutes: FastifyPluginAsyncZod<{ redis: Redis }> = async (
           .returning();
         if (!row) throw httpError(409, 'only a ready plan with actions can be approved');
         await auditPlatform(tx, req, 'stack_plan.approved', row.id);
+        return toPlan(row);
+      });
+    },
+  );
+
+  // The connect card: what a `connect` action needs, entered here so apply does not ask for it.
+  // Secrets are encrypted at once and never shown again (only their last 4 characters).
+  app.put(
+    '/stack/plans/:id/connect/:component',
+    {
+      preHandler: requireOperator,
+      schema: {
+        tags: ['admin'],
+        hide: true,
+        params: Id.extend({ component: z.string() }),
+        body: z.object({ values: z.record(z.string(), z.string().trim().min(1).max(4096)) }),
+        response: { 200: Plan, 400: ErrorBody, 404: ErrorBody, 409: ErrorBody },
+      },
+    },
+    async (req) => {
+      const { id, component } = req.params;
+      return db.transaction(async (tx) => {
+        const [plan] = await tx
+          .select()
+          .from(stackPlans)
+          .where(eq(stackPlans.id, id))
+          .for('update');
+        if (!plan) throw httpError(404, 'no such plan');
+        if (!['ready', 'approved'].includes(plan.status)) {
+          throw httpError(409, 'only a plan that has not run yet takes values');
+        }
+        if (plan.stackVersion !== stackVersion()) {
+          throw httpError(409, 'the stack changed since this plan was made: ask again');
+        }
+        const fields = plan.actions?.some((a) => a.component === component && a.mode === 'connect')
+          ? connectFields(component)
+          : [];
+        if (!fields.length) throw httpError(400, 'this plan does not connect that component');
+        const mine = { ...plan.connect?.[component] };
+        for (const [key, v] of Object.entries(req.body.values)) {
+          const f = fields.find((x) => x.key === key);
+          if (!f) throw httpError(400, `unknown field ${key}`);
+          if (f.validate && !new RegExp(f.validate).test(v)) throw httpError(400, f.prompt);
+          if (v.includes('$') || /[\r\n]/.test(v))
+            throw httpError(400, `${key}: no $ or line breaks`);
+          mine[key] = f.secret
+            ? {
+                cipher: encryptSecret(v, `stack-plan/${id}/${component}/${key}`),
+                hint: v.slice(-4),
+              }
+            : { value: v };
+        }
+        const [row] = await tx
+          .update(stackPlans)
+          // New values were not approved: an approved plan goes back to waiting for approval.
+          .set({
+            connect: { ...plan.connect, [component]: mine },
+            status: 'ready',
+            approvedBy: null,
+            approvedAt: null,
+          })
+          .where(eq(stackPlans.id, id))
+          .returning();
+        if (!row) throw new Error('update returned no row');
+        await auditPlatform(tx, req, 'stack_plan.connect_entered', id);
         return toPlan(row);
       });
     },

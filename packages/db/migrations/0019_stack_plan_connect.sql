@@ -1,0 +1,1 @@
+ALTER TABLE "stack_plans" ADD COLUMN "connect" jsonb;
