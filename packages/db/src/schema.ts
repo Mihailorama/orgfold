@@ -504,6 +504,13 @@ export const stackPlans = pgTable(
     reply: text('reply'),
     /** [{ component, mode }] with mode install | connect | skip, checked against the catalog. */
     actions: jsonb('actions').$type<{ component: string; mode: string }[]>(),
+    /** What the operator entered for each `connect` action, per field: a plain value, or a secret
+     * encrypted (`cipher`, bound to `stack-plan/<id>/<component>/<key>`) with its last 4 `hint`.
+     * Write-only from the page; `pnpm run infra -- apply` reads it over SSH and clears it. */
+    connect:
+      jsonb('connect').$type<
+        Record<string, Record<string, { value?: string; cipher?: string; hint?: string }>>
+      >(),
     stackVersion: text('stack_version').notNull(),
     aiCallId: uuid('ai_call_id').references(() => aiCalls.id, { onDelete: 'set null' }),
     /** Kept when the operator's account is deleted: the plan stays in the record. */
