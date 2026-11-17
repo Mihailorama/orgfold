@@ -44,13 +44,16 @@ type Component = {
   ramMiB: number | null;
   requires: Record<string, string[]>;
   status: Status;
+  offers: Offer[];
 };
+/** A service with a free or cheap tier to connect (config/components.json `offers`). */
+type Offer = { name: string; url: string; free: string; checked: string };
 type Plan = {
   id: string;
   request: string;
   status: 'drafting' | 'ready' | 'failed' | 'off' | 'approved' | 'applied';
   reply: string | null;
-  actions: { component: string; mode: Mode; fields: Field[] }[];
+  actions: { component: string; mode: Mode; fields: Field[]; offers: Offer[] }[];
   current: boolean;
   createdAt: string;
 };
@@ -335,6 +338,7 @@ function ChangeDialog({ c, titleOf, reported }: RowProps & { c: Component }) {
             <li key={w}>{w}</li>
           ))}
         </ul>
+        {c.modes.includes('connect') && <Offers offers={c.offers} />}
         {reported && choices.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {choices.map((m) => (
@@ -580,6 +584,7 @@ function ActionCard({
           </Badge>
         )}
       </div>
+      {editable && <Offers offers={action.offers} />}
       {action.fields.length > 0 &&
         (editable ? (
           <ConnectForm action={action} title={title} planId={planId} onDone={onDone} />
@@ -661,5 +666,27 @@ function ConnectForm({
         Save
       </Button>
     </form>
+  );
+}
+
+/** "No account yet?": services with a free or cheap tier, with the day their terms were checked. */
+function Offers({ offers }: { offers: Offer[] }) {
+  if (!offers.length) return null;
+  return (
+    <div className="space-y-1 text-sm">
+      <p className="text-muted-foreground">No account yet? These start free or cheap:</p>
+      <ul className="space-y-1">
+        {offers.map((o) => (
+          <li key={o.name}>
+            <a href={o.url} target="_blank" rel="noreferrer" className="font-medium underline">
+              {o.name}
+            </a>
+            <span className="text-muted-foreground">
+              : {o.free} (checked {o.checked})
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

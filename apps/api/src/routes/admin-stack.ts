@@ -26,6 +26,13 @@ import {
  * go through `pnpm run infra` on the admin's machine, which also writes STACK_MODES.
  */
 
+/** A service to connect with a free or cheap tier (config/components.json `offers`). */
+const Offer = z.object({
+  name: z.string(),
+  url: z.string(),
+  free: z.string(),
+  checked: z.string(),
+});
 type Catalog = {
   components: {
     id: string;
@@ -44,6 +51,7 @@ type Catalog = {
       default?: string;
       validate?: string;
     }[];
+    offers?: z.infer<typeof Offer>[];
   }[];
 };
 const catalog = (
@@ -72,7 +80,13 @@ const Field = z.object({
   /** Entered already: the plain value, or a secret's last 4 characters. */
   entered: z.string().nullable(),
 });
-const Action = z.object({ component: z.string(), mode: Mode, fields: z.array(Field) });
+const Action = z.object({
+  component: z.string(),
+  mode: Mode,
+  fields: z.array(Field),
+  offers: z.array(Offer),
+});
+const offersOf = (id: string) => catalog.find((c) => c.id === id)?.offers ?? [];
 const toActions = (actions: { component: string; mode: string }[], entered: Entered) =>
   actions.map((a) => ({
     component: a.component,
@@ -90,6 +104,7 @@ const toActions = (actions: { component: string; mode: string }[], entered: Ente
             };
           })
         : [],
+    offers: a.mode === 'connect' ? offersOf(a.component) : [],
   }));
 
 /**
@@ -110,6 +125,7 @@ const Component = z.object({
   ramMiB: z.number().nullable(),
   requires: z.record(z.string(), z.array(z.string())),
   status: Status,
+  offers: z.array(Offer),
 });
 const Stack = z.object({
   profile: z.object({ name: z.string(), address: z.string(), mailFrom: z.string().nullable() }),
@@ -218,6 +234,7 @@ export const adminStackRoutes: FastifyPluginAsyncZod<{ redis: Redis }> = async (
             url,
             ramMiB: c.install?.ramMiB ?? null,
             requires: c.requires ?? {},
+            offers: c.offers ?? [],
             status: await check(redis, c.id, mode, url),
           };
         }),

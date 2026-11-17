@@ -645,6 +645,7 @@ async function ask(a, current, secrets, only, fixed) {
       ca.mode = fixed?.[c.id] ?? c.modes[0];
     } else ca.mode = ok(await p.select({ message, options, initialValue }));
     if (ca.mode !== 'connect') return;
+    if (c.offers?.length) p.log.info(offersText(c.offers));
     for (const f of (c.connect ?? []).flatMap((f) => expandField(f, ca))) {
       if (!f.secret) {
         const list = choices(f.key, ca);
@@ -750,6 +751,13 @@ export function checkPlan(plan, stackModes) {
   }
   return Object.keys(fixed).length ? fixed : 'the plan has no actions';
 }
+
+/** "No account yet?" for the wizard: services with a free or cheap tier (components.json `offers`). */
+export const offersText = (offers) =>
+  [
+    'No account yet? These start free or cheap:',
+    ...offers.map((o) => `  ${o.name}: ${o.free} (${o.url}, checked ${o.checked})`),
+  ].join('\n');
 
 /**
  * Values entered in the Stack page's connect cards: secrets join the run's secrets (never the

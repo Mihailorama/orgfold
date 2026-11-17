@@ -57,6 +57,18 @@ test('the catalog covers every prod profile and example.env key', () => {
   ]);
   const broken = [{ id: 'x', tier: 'core', description: 'x', modes: ['install'], install: {} }];
   assert.match(checkComponents(broken, [], []).join(), /install needs ramMiB/);
+  const offer = {
+    name: 'X',
+    url: 'https://example.com/pricing',
+    free: '1 GB',
+    checked: '2026-11-17',
+  };
+  const offers = (o, modes = ['connect']) => [
+    { id: 'x', title: 'X', tier: 'optional', description: 'x', modes, offers: [o] },
+  ];
+  assert.deepEqual(checkComponents(offers(offer), [], []), []);
+  assert.match(checkComponents(offers(offer, ['install']), [], []).join(), /without a connect/);
+  assert.match(checkComponents(offers({ ...offer, checked: 'soon' }), [], []).join(), /checked/);
 });
 
 test('answers: valid ones pass, secrets and wrong choices are refused', () => {

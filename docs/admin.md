@@ -87,7 +87,12 @@ the account's role to `user`.
   secret's last 4 characters. They never reach the agent, and a request that looks like it carries
   a key (known key shapes, a URL with a password) is refused before it does. Apply takes them
   (secrets join the run's secrets, never the answers file; `INFRA_<KEY>` still wins) and clears
-  them when it marks the plan applied. Plans are `stack_plans` rows (not
+  them when it marks the plan applied.
+  A connect card, and the Add dialog of a component that can be connected, list "No account yet?"
+  services with a free or cheap tier (`offers` in config/components.json: name, pricing page, the
+  tier in a few words, the day it was checked); `pnpm run infra` prints the same list when you
+  choose to connect. Terms drift: `pnpm check:components` warns about an offer checked over 6
+  months ago, and the check is redone against the vendor's pricing page. Plans are `stack_plans` rows (not
   tenant data). It thinks with the model connected on the console's first step (below), or the one
   `AI_STACK_PLAN_*` name; without one it answers "Agent off". Its AI calls are audited under
   `STACK_AI_ORG_ID`, or an "Operator console" organization the worker makes on first use.

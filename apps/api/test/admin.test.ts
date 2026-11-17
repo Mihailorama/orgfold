@@ -284,6 +284,7 @@ describe('stack (docs/admin.md "Stack")', () => {
             { key: 'TWENTY_API_URL', secret: false, entered: null },
             { key: 'TWENTY_API_KEY', secret: true, entered: null },
           ],
+          offers: [{ name: 'Twenty Cloud', checked: expect.stringMatching(/^\d{4}-/) }],
         },
       ],
     });
