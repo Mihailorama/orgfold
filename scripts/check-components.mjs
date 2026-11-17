@@ -52,6 +52,20 @@ export function checkComponents(components, profiles, keys, exists = () => true)
         errors.push(`${at}: ${f.key} validate is not a regex`);
       }
     }
+    // Services to connect with a free or cheap tier (shown at connect): facts that drift, so each
+    // names its source and the day it was checked, and is re-checked at least every 6 months.
+    for (const o of c.offers ?? []) {
+      if (!c.modes.includes('connect')) errors.push(`${at}: offers without a connect mode`);
+      if (
+        !o.name ||
+        !/^https:\/\//.test(o.url ?? '') ||
+        !o.free ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(o.checked ?? '')
+      )
+        errors.push(`${at}: offers need name, https url, free and checked (YYYY-MM-DD)`);
+      else if (Date.now() - Date.parse(o.checked) > 183 * 864e5)
+        console.warn(`warning: ${at} offer ${o.name} last checked ${o.checked}: check it again`);
+    }
     for (const k of c.keys ?? []) owned.add(k);
     for (const r of Object.values(c.requires ?? {}).flat()) {
       if (!components.some((o) => `${o.id}:install` === r || `${o.id}:connect` === r))

@@ -87,4 +87,10 @@ test('view as user is read-only with a banner; suspend shows members a notice', 
   const add = page.getByRole('region', { name: 'Add to the stack' });
   await add.getByRole('button', { name: 'Add' }).first().click();
   await expect(page.getByRole('dialog').getByText(/^pnpm run infra -- add /)).toBeVisible();
+  // One click makes a plan; its connect card takes the key here, never through the agent.
+  await page.getByRole('dialog').getByRole('button', { name: 'Connect the existing one' }).click();
+  const card = page.getByRole('form', { name: /^Connect / }).first();
+  await card.getByLabel(/PostHog project API key/).fill('phc_e2e');
+  await card.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('Ready to connect').first()).toBeVisible();
 });

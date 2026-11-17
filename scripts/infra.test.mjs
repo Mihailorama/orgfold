@@ -16,6 +16,7 @@ import {
   render,
   rotateErrors,
   summary,
+  takeEntered,
   validateAnswers,
 } from './infra.mjs';
 
@@ -56,6 +57,18 @@ test('the catalog covers every prod profile and example.env key', () => {
   ]);
   const broken = [{ id: 'x', tier: 'core', description: 'x', modes: ['install'], install: {} }];
   assert.match(checkComponents(broken, [], []).join(), /install needs ramMiB/);
+  const offer = {
+    name: 'X',
+    url: 'https://example.com/pricing',
+    free: '1 GB',
+    checked: '2026-11-17',
+  };
+  const offers = (o, modes = ['connect']) => [
+    { id: 'x', title: 'X', tier: 'optional', description: 'x', modes, offers: [o] },
+  ];
+  assert.deepEqual(checkComponents(offers(offer), [], []), []);
+  assert.match(checkComponents(offers(offer, ['install']), [], []).join(), /without a connect/);
+  assert.match(checkComponents(offers({ ...offer, checked: 'soon' }), [], []).join(), /checked/);
 });
 
 test('answers: valid ones pass, secrets and wrong choices are refused', () => {
@@ -322,6 +335,24 @@ test('a plan from the Stack page runs only approved, for the same stack, catalog
     assert.match(checkPlan(plan({ actions: [action] }), modes), /outside the catalog/);
   }
   assert.match(checkPlan(plan({ actions: [] }), modes), /no actions/);
+});
+
+test("values from the Stack page's connect card: secrets stay out of the answers", () => {
+  const a = answers();
+  a.components.crm = { mode: 'connect', TWENTY_API_URL: 'https://old.example.com' };
+  const secrets = {};
+  const entered = {
+    crm: { TWENTY_API_URL: 'https://crm.example.com', TWENTY_API_KEY: 'local-dev-key' },
+    analytics: { POSTHOG_KEY: 'phc_x' }, // not connected by this plan: ignored
+  };
+  takeEntered(a, secrets, entered);
+  assert.equal(a.components.crm.TWENTY_API_URL, 'https://crm.example.com');
+  assert.equal(a.components.crm.TWENTY_API_KEY, undefined);
+  assert.deepEqual(secrets, { TWENTY_API_KEY: 'local-dev-key' });
+  assert.deepEqual(validateAnswers(a), []);
+  const passed = { TWENTY_API_KEY: 'from-env' }; // INFRA_TWENTY_API_KEY wins
+  takeEntered(a, passed, entered);
+  assert.equal(passed.TWENTY_API_KEY, 'from-env');
 });
 
 test('the receipt lists what is installed with addresses, then connected and skipped', () => {
