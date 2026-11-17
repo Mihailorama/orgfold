@@ -9,7 +9,7 @@ import { join } from 'node:path';
  * the CLI's login, so no tool may read files or run commands: a prompt injection could otherwise
  * copy the subscription token into the answer. Flags checked against each CLI's docs and `--help`
  * on 2026-11-07, and the tool list each CLI sends checked against a local mock of the vendor API
- * (Codex 0.167.0, Gemini CLI 0.67.0, the Dockerfile's versions); a CLI release can change them,
+ * (Codex 0.169.0, Gemini CLI 0.67.0, the Dockerfile's versions); a CLI release can change them,
  * so adapters stay small and tested against a fake binary (test/fake-cli.mjs).
  */
 export type Message = { role: 'system' | 'user' | 'assistant'; content: string };

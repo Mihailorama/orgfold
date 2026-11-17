@@ -26,6 +26,7 @@ import { api } from '@/lib/api';
 import { authClient } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { Section } from '@/pages/admin';
+import { ModelSection, useAi } from '@/pages/admin-ai';
 
 type Mode = 'install' | 'connect' | 'skip';
 type Status = 'up' | 'down' | 'unchecked';
@@ -166,6 +167,7 @@ function StackBody({ stack }: { stack: Stack }) {
         </dl>
       </Section>
 
+      <ModelBlock />
       {stack.reported && <PlanSection titleOf={titleOf} />}
 
       {stack.reported &&
@@ -347,6 +349,11 @@ const PLAN_STATUS: Record<Plan['status'], string> = {
 const NOT_FRESH = 'approving needs a recent sign-in: sign in again, then approve';
 
 /** "Plan a change": the agent turns a request into catalog actions (docs/admin.md). */
+function ModelBlock() {
+  const ai = useAi();
+  return ai.data ? <ModelSection ai={ai.data} /> : null;
+}
+
 function PlanSection({ titleOf }: { titleOf: (id: string) => string }) {
   const queryClient = useQueryClient();
   const [request, setRequest] = useState('');

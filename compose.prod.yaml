@@ -107,6 +107,9 @@ services:
       - APP_NAME
       # operator console, Stack page: modes, sender, and the install.site key of each on-box tool
       - STACK_MODES
+      # "Connect a model": subscription sign-ins run in llm-cli (docs/admin.md)
+      - LLM_CLI_URL=${LLM_CLI_URL:-http://llm-cli:8080}
+      - LLM_CLI_TOKEN
       - MAIL_FROM
       - CRM_PUBLIC_URL
       - UMAMI_PUBLIC_URL
@@ -290,9 +293,10 @@ services:
 
   # Static files + /api proxy; sets CSP/HSTS/nosniff/Referrer-Policy (apps/web/nginx.conf.template).
   # Vendor CLI subscriptions for the worker (docs/llm-providers.md). Enable with COMPOSE_PROFILES
-  # containing llm-cli and IMAGE_LLM_CLI (repo@sha256:...) in the env file: the image contains the
-  # proprietary Claude Code CLI, so CI does not publish it; build services/llm-cli/Dockerfile
-  # yourself and push it to a private registry. Logins: files in LLM_CLI_SECRETS_DIR on the host
+  # containing llm-cli and IMAGE_LLM_CLI in the env file: the image contains the proprietary
+  # Claude Code CLI, so CI does not publish it. `pnpm run infra` builds it on the server when a
+  # subscription is chosen; otherwise build services/llm-cli/Dockerfile yourself and push it to a
+  # private registry. Logins: files in LLM_CLI_SECRETS_DIR on the host
   # (mode 600), named in its config. Internal only: no ports.
   llm-cli:
     profiles: [llm-cli]
@@ -306,7 +310,7 @@ services:
       - LLM_CLI_TOKEN
       - LLM_CLI_CONFIG=${LLM_CLI_CONFIG:-/etc/llm-cli/config.json}
     volumes:
-      - ${LLM_CLI_SECRETS_DIR:-./llm-cli-secrets}:/run/secrets/llm-cli:ro
+      - ${LLM_CLI_SECRETS_DIR:-./llm-cli-secrets}:/run/secrets/llm-cli
 
   web:
     image: ${IMAGE_WEB:?no release, deploy with scripts/deploy.mjs}

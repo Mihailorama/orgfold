@@ -38,6 +38,13 @@ test('view as user is read-only with a banner; suspend shows members a notice', 
   await page.getByRole('button', { name: 'Done' }).click();
 
   await page.goto('/admin');
+  // First step: connect the agents' model (subscription or API key); skipped here.
+  await expect(
+    page.getByRole('heading', { name: 'Connect a model for your agents' }),
+  ).toBeVisible();
+  await expect(page.getByRole('radio', { name: /Anthropic/ })).toBeVisible();
+  await expectAccessibleInBothThemes(page, 'admin-connect-model');
+  await page.getByRole('button', { name: 'Skip for now' }).click();
   await page.getByLabel('Search').fill(org);
   await page.getByRole('link', { name: org }).click();
   await expect(page.getByRole('heading', { name: org })).toBeVisible();
@@ -74,6 +81,7 @@ test('view as user is read-only with a banner; suspend shows members a notice', 
   await page.getByRole('link', { name: 'Stack' }).first().click();
   await expect(page.getByRole('heading', { name: 'Stack', exact: true })).toBeVisible();
   await expectAccessibleInBothThemes(page, 'admin-stack');
+  await expect(page.getByRole('button', { name: 'Make a plan' })).toBeDisabled();
   const application = page.getByRole('region', { name: 'Application' });
   await expect(application.getByText('Running', { exact: true })).toBeVisible();
   const add = page.getByRole('region', { name: 'Add to the stack' });

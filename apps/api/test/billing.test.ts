@@ -505,6 +505,7 @@ describe('organization-owned AI providers (BYO)', () => {
     expect((await call(owner, 'POST', '/api/ai-providers', anthropic)).statusCode).toBe(400);
     env.AI_CONTOUR = 'eu'; // lists anthropic, not openai_compatible or openrouter
     try {
+      // openai and gemini are listed only for the operator's stack.plan: not an org's key
       expect(await ids()).toEqual(['anthropic']);
       expect((await call(owner, 'POST', '/api/ai-providers', custom)).statusCode).toBe(400);
       const openrouter = { ...anthropic, provider: 'openrouter' };

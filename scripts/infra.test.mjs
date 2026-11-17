@@ -11,6 +11,7 @@ import {
   command,
   expandField,
   freshEnvError,
+  option,
   plan,
   render,
   rotateErrors,
@@ -96,7 +97,7 @@ test('render: secrets generated once, kept, rotated on request; derived values f
   const first = render(answers(), {}, { secrets });
   const { env } = first;
   assert.deepEqual(first.missing, []);
-  assert.equal(env.COMPOSE_PROFILES, 'db,s3');
+  assert.equal(env.COMPOSE_PROFILES, 'db,s3,llm-cli');
   // the console's stack page reads how each component runs; every available one is listed
   assert.match(
     env.STACK_MODES,
@@ -150,8 +151,10 @@ test('plan (dry run): key names only, no value, exact text', () => {
   components: core install, postgres install, s3 install, smtp connect, analytics install, llm connect, vault install, crm skip
   profiles: + analytics, + vault
   env keys: ~ S3_ACCESS_KEY_ID (generated), + UMAMI_PUBLIC_URL, + UMAMI_DB_PASSWORD (generated), + UMAMI_APP_SECRET (generated), + UMAMI_ADMIN_PASSWORD (generated), + ANALYTICS_ORIGINS, + VAULT_PUBLIC_URL, + VAULT_DB_PASSWORD (generated), + VAULT_DATABASE_URL, + SSO_VAULTWARDEN_SECRET (generated), + SSO_VAULTWARDEN_REDIRECT_URIS, ~ STACK_MODES, - POSTHOG_HOST, - POSTHOG_KEY
-  RAM budget (mem_limit): 3.5 GiB of 3.8 GiB on the server
-  WARNING: that is more than 90 % of it`,
+  RAM budget (mem_limit): 5.5 GiB of 3.8 GiB on the server
+  NOTE: the limits add up to more than 90 % of the server. It starts, but under load or with
+  more components later a bigger server is recommended: resize it at your provider (data stays),
+  or run heavy components on a second server and connect them.`,
     );
     for (const value of [...out.generated.map((k) => out.env[k]), ...Object.values(secrets)]) {
       assert.ok(!text.includes(value) && !printed.join('\n').includes(value), 'a value leaked');
@@ -168,9 +171,55 @@ test('@apiKey follows the env names of config/ai-models.json', () => {
   );
   const f = { key: '@apiKey', prompt: 'key', secret: true };
   for (const [id, p] of Object.entries(providers)) {
+    if (p.kind === 'cli') continue;
     const keys = expandField(f, { AI_PROJECT_SUMMARY_PROVIDER: id }).map((x) => x.key);
     assert.deepEqual(keys, [p.baseUrlEnv, p.apiKeyEnv].filter(Boolean), id);
   }
+  // A subscription asks for its login instead; llm-cli reads it from the file in its config.
+  const login = (id) => expandField(f, { AI_PROJECT_SUMMARY_PROVIDER: id });
+  assert.deepEqual(
+    login('claude_cli').map((x) => [x.key, x.secret, x.login]),
+    [['LLM_CLI_CLAUDE_TOKEN', true, 'claude']],
+  );
+  assert.deepEqual(
+    login('codex_cli').map((x) => x.key),
+    ['LLM_CLI_CODEX_AUTH'],
+  );
+  assert.deepEqual(login('gemini_cli'), []);
+  const config = readFileSync(new URL('../infra/llm-cli/config.json', import.meta.url), 'utf8');
+  for (const file of ['claude-1.token', 'codex-1.auth.json'])
+    assert.ok(config.includes(file), file);
+});
+
+test('llm-cli always runs for the console sign-ins; a model set here runs the stack agent', () => {
+  const env = render(answers(), {}, { secrets }).env;
+  assert.equal(env.AI_STACK_PLAN_PROVIDER, 'anthropic');
+  assert.equal(env.AI_STACK_PLAN_MODEL, 'claude-haiku-5-5');
+  assert.ok(env.COMPOSE_PROFILES.split(',').includes('llm-cli'));
+  assert.match(env.IMAGE_LLM_CLI, /^app-llm-cli:[0-9a-f]{12}$/);
+  assert.match(env.LLM_CLI_TOKEN, /^[0-9a-f]{64}$/);
+
+  const a = answers();
+  a.components.llm.AI_PROJECT_SUMMARY_PROVIDER = 'claude_cli';
+  a.operators = 'ops@example.com';
+  assert.deepEqual(validateAnswers(a), []);
+  const sub = render(a, {}, { secrets: { ...secrets, LLM_CLI_CLAUDE_TOKEN: 'local-dev-token' } });
+  assert.deepEqual(sub.missing, []);
+  assert.equal(sub.env.AI_STACK_PLAN_PROVIDER, 'claude_cli');
+  assert.equal(sub.env.LLM_CLI_CLAUDE_TOKEN, 'local-dev-token');
+  assert.equal(sub.env.OPERATOR_EMAILS, 'ops@example.com');
+  // kept on a re-run; without a model here only the CLI's login and the agent's model go
+  assert.equal(render(a, sub.env, {}).env.LLM_CLI_TOKEN, sub.env.LLM_CLI_TOKEN);
+  a.components.llm = { mode: 'skip' };
+  const off = render(a, sub.env, {}).env;
+  for (const k of ['LLM_CLI_CLAUDE_TOKEN', 'AI_STACK_PLAN_MODEL', 'AI_PROJECT_SUMMARY_MODEL'])
+    assert.equal(off[k], undefined, k);
+  assert.equal(off.LLM_CLI_TOKEN, sub.env.LLM_CLI_TOKEN);
+  assert.ok(off.COMPOSE_PROFILES.split(',').includes('llm-cli'));
+  assert.equal(off.AI_CONTOUR, 'eu'); // the console's model needs a contour
+  assert.deepEqual(validateAnswers({ ...a, operators: 'not-an-email' }), [
+    'operators: e-mail addresses, comma-separated',
+  ]);
 });
 
 test("bootstrap keeps every SSH port open: the client's, sshd -T, ListenAddress, ssh.socket", () => {
@@ -217,6 +266,11 @@ test('--rotate only what the server re-applies', () => {
   ]);
   assert.equal(errors.length, 3);
   assert.match(errors[0], /--rotate POSTGRES_PASSWORD: nothing re-applies it/);
+});
+
+test('an absent flag has no value: verify without --org bills no organization', () => {
+  assert.equal(option(['demo', 'verify'], '--org'), undefined);
+  assert.equal(option(['verify', '--org', 'org_1'], '--org'), 'org_1');
 });
 
 test('the subcommand counts wherever it stands: a misplaced plan stays a dry run', () => {

@@ -24,6 +24,7 @@ export interface paths {
                     content: {
                         "application/json": {
                             sso: boolean;
+                            appName: string;
                         };
                     };
                 };

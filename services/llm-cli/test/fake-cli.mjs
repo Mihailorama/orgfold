@@ -14,6 +14,15 @@ import { join } from 'node:path';
 
 const args = process.argv.slice(2);
 const env = process.env;
+// `codex login --device-auth`: shows a link and a code, then writes the login like Codex does.
+if (args[0] === 'login') {
+  process.stdout.write('1. Open \x1b[94mhttps://auth.openai.com/codex/device\x1b[0m\n');
+  process.stdout.write('2. Enter this one-time code \x1b[94mABCD-12345\x1b[0m\n');
+  await new Promise((r) => setTimeout(r, Number(env.FAKE_LOGIN_MS ?? 200)));
+  if (env.FAKE_LOGIN_FAIL) process.exit(1);
+  writeFileSync(join(env.CODEX_HOME, 'auth.json'), '{"tokens":"local-dev"}');
+  process.exit(0);
+}
 let stdin = '';
 for await (const chunk of process.stdin) stdin += chunk;
 const mark = env.FAKE_STATE && join(env.FAKE_STATE, `run-${process.pid}`);
@@ -68,7 +77,14 @@ switch (env.FAKE_AS) {
       ),
     );
     break;
-  case 'codex':
+  case 'codex': {
+    // Codex refreshes its login in HOME and rotates the refresh token.
+    const auth = join(env.HOME ?? '/nonexistent', '.codex/auth.json');
+    let login = '';
+    try {
+      login = readFileSync(auth, 'utf8');
+    } catch {}
+    if (login.includes('local-dev')) writeFileSync(auth, '{"tokens":"refreshed"}');
     for (const e of [
       { type: 'thread.started', thread_id: 't1' },
       { type: 'item.completed', item: { id: 'i1', type: 'reasoning', text: 'thinking' } },
@@ -80,6 +96,7 @@ switch (env.FAKE_AS) {
     ])
       process.stdout.write(`${JSON.stringify(e)}\n`);
     break;
+  }
   case 'gemini':
     process.stdout.write(
       JSON.stringify({

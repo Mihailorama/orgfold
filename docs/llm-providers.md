@@ -106,7 +106,7 @@ structured output where the CLI has it:
 Sources (checked 2026-11-07): Claude Code `claude --help` 2.1.319 and
 [headless](https://code.claude.com/docs/en/headless) / [authentication](https://code.claude.com/docs/en/authentication)
 docs ("generate a one-year OAuth token with `claude setup-token`"); Codex `codex exec --help`
-0.167.0 and [non-interactive mode](https://developers.openai.com/codex/noninteractive); Gemini
+0.169.0 and [non-interactive mode](https://developers.openai.com/codex/noninteractive); Gemini
 CLI [reference](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/cli-reference.md)
 ("Prompt text. Appended to stdin input if provided. Forces non-interactive mode.") and
 [system prompt](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/system-prompt.md).
@@ -122,7 +122,7 @@ environment variable). A tool that can read files or run commands would let a pr
 in user content copy that token into the answer, which is stored and shown. So every adapter turns
 tools off, and the run's working directory is a scratch dir outside HOME. Checked against a local
 mock of each vendor API, recording the tool list the CLI sends (Codex 0.167.0, Gemini CLI 0.67.0,
-2026-11-07):
+2026-11-07; Codex 0.169.0 again on 2026-11-16 with model `gpt-5.5`, the same two tools left):
 
 - Codex: `--sandbox read-only` alone still offers `exec_command` (shell; read-only still reads
   every file), `view_image`, `web_search`, `tool_search` and goal tools. The `--disable` features
@@ -144,6 +144,15 @@ HOME. They are never baked into the image and never logged; each CLI run gets on
 subscription's environment (not the shim's, so `LLM_CLI_TOKEN` and other logins stay invisible)
 and runs in an empty scratch directory outside that HOME. A subscription whose file is missing is skipped.
 llm-cli listens only on the internal network and requires `Authorization: Bearer $LLM_CLI_TOKEN`.
+
+**Signing in from the console.** The same bearer token guards `/logins` (docs/admin.md "Connect a
+model"; the API calls it, never the browser): `GET /logins` says which CLIs have a login,
+`PUT /logins/claude {token}` writes the `claude setup-token` token, `POST /logins/codex` runs
+`codex login --device-auth` in a throwaway HOME and returns the link and one-time code the operator
+enters (the login file is written when they finish), `DELETE /logins/<cli>` signs out. Each writes
+the file the config names for the CLI's first subscription (mode 600) and reloads the CLIs, so the
+login directory is mounted writable. After a call, a login the CLI refreshed in its HOME is written
+back (Codex rotates its refresh token; the old file would be revoked).
 
 **Concurrency and fallback.** Each subscription has its own `concurrency` (default 1). A request
 takes the next free subscription of its CLI round-robin; when all are busy it waits in a bounded

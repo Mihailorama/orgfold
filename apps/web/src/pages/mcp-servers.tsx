@@ -36,7 +36,7 @@ import { Label } from '@/components/ui/label';
 import { track } from '@/lib/analytics';
 import { type Body, client, type Ok, ok } from '@/lib/api';
 import { useFlag } from '@/lib/flags';
-import models from '../../../../config/ai-models.json';
+import { contours } from '../../../../config/ai-models.json';
 
 /** External MCP servers whose allowed tools AI features may call (docs/mcp.md). Org admins. */
 type Server = Ok<'/api/mcp-servers/', 'get'>[number];
@@ -45,7 +45,7 @@ const listQuery = { queryKey: ['mcp-servers'], queryFn: () => ok(client.GET('/ap
 // Same limits as the API schema (apps/api/src/routes/mcp-servers.ts); the API stays the authority.
 /** Purposes of config/ai-models.json, as the API accepts them (the judge is the operator's). */
 const PURPOSES = [
-  ...new Set(Object.values(models.contours).flatMap((c) => c.flatMap((m) => m.purposes))),
+  ...new Set(Object.values(contours).flatMap((c) => c.flatMap((m) => m.purposes))),
 ].filter((p) => p !== 'judge');
 const toolList = (s: string) =>
   s

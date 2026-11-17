@@ -1,10 +1,10 @@
 import { Link } from '@tanstack/react-router';
 import { ArrowLeft, Sparkles } from 'lucide-react';
-import models from '../../../../config/ai-models.json';
+import { contours as allContours } from '../../../../config/ai-models.json';
 import page from '../../../../config/ai-transparency.json';
 
 type Model = { provider: string; model: string; purposes: string[] };
-const contours = Object.entries(models.contours as Record<string, Model[]>);
+const contours = Object.entries(allContours as Record<string, Model[]>);
 
 /** Public page: what AI is used for, which models, and how to contest a result. */
 export function AiTransparencyPage() {
