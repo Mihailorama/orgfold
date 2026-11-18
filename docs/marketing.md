@@ -206,8 +206,9 @@ The report logs in to Umami as a user with the `view-only` role who is a `team-v
 of the team that owns the site, so its password can read the numbers and change nothing. The site
 itself counts into Umami through the variables `PAGES_UMAMI_SCRIPT_URL` (`https://<umami>/script.js`)
 and `PAGES_UMAMI_WEBSITE_ID`, read only by the Pages build (`pages.yml`): the released web image
-reads `VITE_UMAMI_*`, so the site's tracker never ends up in it. Add the bot to the chat (as an
-admin in a channel) before the first run.
+reads `VITE_UMAMI_*`, so the site's tracker never ends up in it. Send the report with the
+product's own bot to the owner's private chat with it (docs/support.md "One bot per product"):
+analytics never go to a visitor's chat. The owner opens the bot once (`/start`) before the first run.
 
 ## Search Console (`pnpm seo:report`)
 

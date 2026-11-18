@@ -357,6 +357,27 @@ team reply in the topic ──> same webhook ──> copied to the user's privat
 - A deleted topic is recreated on the user's next message, a closed one is reopened; a reply the
   user cannot receive (they blocked the bot) gets a "Not delivered" note in the topic.
 
+### One bot per product (launch practice)
+
+Give each product exactly one Telegram bot, named after the product, and never share it with
+another product. The same bot serves visitors (support, linked from the site) and its owner
+(internal messages such as the daily site report, docs/marketing.md "Daily report"); a product
+gets no second bot. The bot has one consumer of its updates: this webhook (a webhook or polling,
+never both).
+
+- Who gets what: internal messages go only to the owner's private chat with the bot, by its
+  numeric chat id kept in a secret (never in the repository); anyone else is a visitor. A visitor's
+  chat may carry the conversation and product announcements (new features, videos), never plans,
+  tasks, priorities, blockers, alerts, SEO or analytics.
+- Questions the team answers go to the product's private support group (the forum group above) and
+  the answer is relayed to the visitor; the bot works in no other group.
+- Infrastructure alerts stay on your ops alert channel (Prometheus alerts, infra/otel), not in the
+  product bot.
+- The public command menu (`/setcommands`) lists support commands only.
+- Tests never write into real chats: use a test bot and a test group, never the product's.
+- Before launch, open the bot from a second Telegram account as a visitor and read everything that
+  arrives: nothing internal may show up there.
+
 ### Set up
 
 1. [@BotFather](https://t.me/BotFather): `/newbot`, keep the token. `/setprivacy` -> Disable is
