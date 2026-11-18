@@ -36,8 +36,10 @@ jobs:
       # list what they turn on (docs/legal.md; pnpm check:legal fails if one is missing here).
       VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY }}
       VITE_POSTHOG_HOST: ${{ vars.VITE_POSTHOG_HOST }}
-      VITE_UMAMI_SCRIPT_URL: ${{ vars.VITE_UMAMI_SCRIPT_URL }}
-      VITE_UMAMI_WEBSITE_ID: ${{ vars.VITE_UMAMI_WEBSITE_ID }}
+      # The site's own Umami (PAGES_UMAMI_*), so counting the site never puts a tracker in the
+      # released web image, which reads VITE_UMAMI_* (release.yml).
+      VITE_UMAMI_SCRIPT_URL: ${{ vars.PAGES_UMAMI_SCRIPT_URL || vars.VITE_UMAMI_SCRIPT_URL }}
+      VITE_UMAMI_WEBSITE_ID: ${{ vars.PAGES_UMAMI_WEBSITE_ID || vars.VITE_UMAMI_WEBSITE_ID }}
       VITE_GA4_ID: ${{ vars.VITE_GA4_ID }}
       VITE_YM_ID: ${{ vars.VITE_YM_ID }}
       VITE_FORMBRICKS_WORKSPACE_ID: ${{ vars.VITE_FORMBRICKS_WORKSPACE_ID }}

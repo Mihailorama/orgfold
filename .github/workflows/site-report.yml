@@ -1,0 +1,33 @@
+name: Site report
+
+# The site's daily report in a Telegram chat: yesterday in Umami and the last 7 days in Search
+# Console (scripts/site-report.mjs, docs/marketing.md "Daily report"). Parts without their
+# variables are left out; with none set the run only logs that.
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      SITE_URL: ${{ vars.PAGES_SITE_URL }}
+      UMAMI_URL: ${{ vars.SITE_REPORT_UMAMI_URL }}
+      UMAMI_WEBSITE_ID: ${{ vars.PAGES_UMAMI_WEBSITE_ID }}
+      UMAMI_USER: ${{ vars.SITE_REPORT_UMAMI_USER }}
+      UMAMI_PASSWORD: ${{ secrets.SITE_REPORT_UMAMI_PASSWORD }}
+      GSC_SITE_URL: ${{ vars.GSC_SITE_URL }}
+      GSC_CREDENTIALS: ${{ secrets.GSC_CREDENTIALS }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.SITE_REPORT_TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ vars.SITE_REPORT_TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: node scripts/site-report.mjs

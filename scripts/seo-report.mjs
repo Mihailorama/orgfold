@@ -74,6 +74,20 @@ async function token(sa) {
   return (await res.json()).access_token;
 }
 
+/** Runs each of `req`'s Search Analytics queries for `site`; `creds` is a key file path or its JSON. */
+export async function query(site, creds, req) {
+  const sa = JSON.parse(creds.trim().startsWith('{') ? creds : readFileSync(creds, 'utf8'));
+  const auth = { authorization: `Bearer ${await token(sa)}`, 'content-type': 'application/json' };
+  const url = `${API}/sites/${encodeURIComponent(site)}/searchAnalytics/query`;
+  const res = {};
+  for (const [name, body] of Object.entries(req)) {
+    const r = await fetch(url, { method: 'POST', headers: auth, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(`${name}: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`);
+    res[name] = await r.json();
+  }
+  return res;
+}
+
 async function main(argv) {
   const days = Number(argv[argv.indexOf('--days') + 1]) || 28;
   const site = process.env.GSC_SITE_URL;
@@ -85,14 +99,7 @@ async function main(argv) {
     for (const body of Object.values(req)) console.log(`POST ${url} ${JSON.stringify(body)}`);
     return;
   }
-  const sa = JSON.parse(creds.trim().startsWith('{') ? creds : readFileSync(creds, 'utf8'));
-  const auth = { authorization: `Bearer ${await token(sa)}`, 'content-type': 'application/json' };
-  const res = {};
-  for (const [name, body] of Object.entries(req)) {
-    const r = await fetch(url, { method: 'POST', headers: auth, body: JSON.stringify(body) });
-    if (!r.ok) throw new Error(`${name}: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`);
-    res[name] = await r.json();
-  }
+  const res = await query(site, creds, req);
   console.log(argv.includes('--json') ? JSON.stringify(res, null, 2) : summarize(site, req, res));
 }
 
