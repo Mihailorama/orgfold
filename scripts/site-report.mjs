@@ -5,7 +5,8 @@
 // Umami (self-hosted): UMAMI_URL, UMAMI_WEBSITE_ID, UMAMI_USER, UMAMI_PASSWORD (a view-only user).
 // Search Console: GSC_SITE_URL, GSC_CREDENTIALS (as `pnpm seo:report`).
 // Telegram: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (the bot must be in that chat or channel).
-// Each part is used only when its variables are set; without the Telegram pair it prints the report.
+// Each part is used only when its variables are set; without the Telegram pair it prints the report
+// (outside CI only).
 import { pathToFileURL } from 'node:url';
 import { query, requests } from './seo-report.mjs';
 
@@ -97,7 +98,9 @@ async function main(env = process.env) {
   if (!parts.umami && !parts.gsc)
     return console.log('site:report: neither Umami nor Search Console is configured');
   const text = format(parts);
-  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return console.log(text);
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID)
+    // A public repository's Actions logs are public: CI never prints the numbers.
+    return console.log(env.CI ? 'site:report: Telegram is not configured, nothing sent' : text);
   const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

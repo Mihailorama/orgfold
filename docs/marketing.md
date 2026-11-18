@@ -192,14 +192,15 @@ Every morning (06:00 UTC) `.github/workflows/site-report.yml` posts the site's n
 Telegram chat: yesterday (UTC) in Umami (visitors and views against the day before, bounce rate,
 top pages, sources, events such as `site_cta_clicked`) and the last 7 days with data in Search
 Console (clicks, impressions, CTR, average position, top queries). A part whose variables are
-missing is left out; without the Telegram pair the run only prints the report in its log. Run it
+missing is left out; without the Telegram pair a local run prints the report and a CI run sends
+nothing (a public repository's logs are public). Run it
 by hand from Actions (Run workflow) or locally with the same env.
 
-| Part           | Repository variables and secrets (Settings, Secrets and variables, Actions)                                                                                                         |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Umami          | variables `SITE_REPORT_UMAMI_URL` (the Umami address), `SITE_REPORT_UMAMI_USER`, `PAGES_UMAMI_WEBSITE_ID`; secret `SITE_REPORT_UMAMI_PASSWORD`                                      |
-| Search Console | variable `GSC_SITE_URL`, secret `GSC_CREDENTIALS` (the key JSON; setup in the next section)                                                                                         |
-| Telegram       | secret `SITE_REPORT_TELEGRAM_BOT_TOKEN` (a bot from @BotFather, or your support bot), variable `SITE_REPORT_TELEGRAM_CHAT_ID` (`@channelname`, or the numeric id of a private chat) |
+| Part           | Repository variables and secrets (Settings, Secrets and variables, Actions)                                                                                                            |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Umami          | variables `SITE_REPORT_UMAMI_URL` (the Umami address), `SITE_REPORT_UMAMI_USER`, `PAGES_UMAMI_WEBSITE_ID`; secret `SITE_REPORT_UMAMI_PASSWORD`                                         |
+| Search Console | variable `GSC_SITE_URL`, secret `GSC_CREDENTIALS` (the key JSON; setup in the next section)                                                                                            |
+| Telegram       | secret `SITE_REPORT_TELEGRAM_BOT_TOKEN` (a bot from @BotFather, or your support bot), secret `SITE_REPORT_TELEGRAM_CHAT_ID` (`@channelname`, or the numeric id of a chat with the bot) |
 
 The report logs in to Umami as a user with the `view-only` role who is a `team-view-only` member
 of the team that owns the site, so its password can read the numbers and change nothing. The site
