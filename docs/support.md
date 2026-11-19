@@ -219,6 +219,8 @@ daily retention schedule deletes any left over after a day. Configuration (worke
   name). Without `state` a new item goes to the project's **Intake**; with it, straight into that
   state. The worker resolves the states at start and refuses to start when one is unknown or in
   the `completed` or `cancelled` group. Labels are created in Plane when missing.
+  If agents work your tracker, never set `state` to the state they pick work up from (for
+  example Todo): what the system files lands in Intake or Backlog, and a human launches it.
 - Nothing ever closes an item or moves it to a completed state: accepting, declining and closing
   are for humans.
 - Errors from tracker calls carry only the HTTP status or the error class: request URLs (Plane's
