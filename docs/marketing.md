@@ -202,6 +202,11 @@ by hand from Actions (Run workflow) or locally with the same env.
 | Search Console | variable `GSC_SITE_URL`, secret `GSC_CREDENTIALS` (the key JSON; setup in the next section)                                                                                            |
 | Telegram       | secret `SITE_REPORT_TELEGRAM_BOT_TOKEN` (a bot from @BotFather, or your support bot), secret `SITE_REPORT_TELEGRAM_CHAT_ID` (`@channelname`, or the numeric id of a chat with the bot) |
 
+For a report factory that sends one message per project (a team running several products):
+`pnpm site:report -- --numbers` prints the day's numbers as JSON instead of sending anything:
+sitemap pages that answer, visitors (yesterday, 7 days, the 7 before), Google search, and the
+GitHub stars of `GITHUB_REPO` (`owner/name`, token in `GITHUB_TOKEN`) as the last funnel step.
+
 The report logs in to Umami as a user with the `view-only` role who is a `team-view-only` member
 of the team that owns the site, so its password can read the numbers and change nothing. The site
 itself counts into Umami through the variables `PAGES_UMAMI_SCRIPT_URL` (`https://<umami>/script.js`)
