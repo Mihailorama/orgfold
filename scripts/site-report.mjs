@@ -7,6 +7,9 @@
 // Telegram: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (the bot must be in that chat or channel).
 // Each part is used only when its variables are set; without the Telegram pair it prints the report
 // (outside CI only).
+// `--numbers`: print the day's numbers as JSON for a report factory instead (docs/marketing.md
+// "Daily report"): sitemap pages that answer, visitors (yesterday, 7 days, the 7 before), Google
+// search, and GitHub stars of GITHUB_REPO (owner/name) as the funnel's last step.
 import { pathToFileURL } from 'node:url';
 import { query, requests } from './seo-report.mjs';
 
@@ -79,8 +82,91 @@ async function umami(env, day) {
   };
   const q = `startAt=${day.start}&endAt=${day.end}`;
   const out = { stats: await get(`stats?${q}`) };
+  const week = await get(`stats?startAt=${day.end + 1 - 7 * 86_400_000}&endAt=${day.end}`);
+  out.week = { visitors: week.visitors, prev: week.comparison?.visitors };
   for (const type of ['path', 'referrer', 'event'])
     out[type] = await get(`metrics?${q}&type=${type}&limit=5`);
+  return out;
+}
+
+/** Stars by day from the stargazer timestamps: yesterday, the last 7 days and the 7 before. */
+export function starCounts(dates, day) {
+  const week = 7 * 86_400_000;
+  const t = dates.map((d) => Date.parse(d));
+  const count = (from, to) => t.filter((x) => x >= from && x <= to).length;
+  return {
+    day: count(day.start, day.end),
+    week: count(day.end + 1 - week, day.end),
+    prev: count(day.end + 1 - 2 * week, day.end - week),
+  };
+}
+
+async function stars(repo, token) {
+  const dates = [];
+  for (let page = 1; ; page++) {
+    const r = await fetch(
+      `https://api.github.com/repos/${repo}/stargazers?per_page=100&page=${page}`,
+      {
+        headers: {
+          accept: 'application/vnd.github.star+json',
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+      },
+    );
+    if (!r.ok) throw new Error(`github stargazers: HTTP ${r.status}`);
+    const batch = await r.json();
+    dates.push(...batch.map((s) => s.starred_at));
+    if (batch.length < 100) return dates;
+  }
+}
+
+async function pages(siteUrl) {
+  const index = await (await fetch(`${siteUrl}/sitemap-index.xml`)).text();
+  const maps = [...index.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  const urls = [];
+  for (const map of maps)
+    urls.push(
+      ...[...(await (await fetch(map)).text()).matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]),
+    );
+  const ok = await Promise.all(
+    urls.map((u) =>
+      fetch(u, { method: 'HEAD' }).then(
+        (r) => r.ok,
+        () => false,
+      ),
+    ),
+  );
+  return { ok: ok.filter(Boolean).length, of: urls.length };
+}
+
+/** The day's numbers in the shape a report factory reads (sdlc-orchestrator roast/daily_report.py). */
+export function numbers({ date, umami, gsc, site, starsByDay, url }) {
+  const out = { date };
+  const said = [];
+  if (site) out.site = site;
+  if (umami) {
+    out.visitors = { day: umami.stats.visitors, week: umami.week.visitors, prev: umami.week.prev };
+    said.push(`посетителей ${umami.week.visitors}`);
+  }
+  if (gsc) {
+    const t = gsc.res.totals.rows?.[0] ?? { clicks: 0, impressions: 0 };
+    const p = (d) => d.slice(8, 10) + '.' + d.slice(5, 7);
+    out.search = [
+      {
+        engine: 'Google',
+        impressions: t.impressions,
+        clicks: t.clicks,
+        period: `${p(gsc.req.totals.startDate)}-${p(gsc.req.totals.endDate)}`,
+      },
+    ];
+    said.push(`кликов из Google ${t.clicks}`);
+  }
+  if (starsByDay) {
+    out.leads = { name: 'Звёзды GitHub', ...starsByDay };
+    said.push(`звёзд на GitHub ${starsByDay.week}`);
+  }
+  out.summary = `За 7 дн.: ${said.join(', ')}.`;
+  if (url) out.url = url;
   return out;
 }
 
@@ -94,6 +180,20 @@ async function main(env = process.env) {
   if (env.GSC_SITE_URL && env.GSC_CREDENTIALS) {
     const req = requests(7);
     parts.gsc = { req, res: await query(env.GSC_SITE_URL, env.GSC_CREDENTIALS, req) };
+  }
+  if (process.argv.includes('--numbers')) {
+    const siteUrl = env.SITE_URL?.replace(/\/$/, '');
+    const out = numbers({
+      date: day.date,
+      umami: parts.umami,
+      gsc: parts.gsc,
+      site: siteUrl ? await pages(siteUrl) : undefined,
+      starsByDay: env.GITHUB_REPO
+        ? starCounts(await stars(env.GITHUB_REPO, env.GITHUB_TOKEN), day)
+        : undefined,
+      url: env.REPORT_URL,
+    });
+    return console.log(JSON.stringify(out));
   }
   if (!parts.umami && !parts.gsc)
     return console.log('site:report: neither Umami nor Search Console is configured');
