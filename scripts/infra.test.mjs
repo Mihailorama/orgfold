@@ -26,7 +26,7 @@ const answers = () => ({
   server: { host: '203.0.113.10', admin: 'root', user: 'deploy' },
   domain: 'app.example.com',
   tls: 'ops@example.com',
-  images: { repo: 'ghcr.io/mihailorama/saas-agent-starter', version: 'v1.0.0' },
+  images: { repo: 'ghcr.io/mihailorama/orgfold', version: 'v1.0.0' },
   components: {
     postgres: { mode: 'install' },
     s3: { mode: 'install' },
@@ -175,7 +175,7 @@ test('plan (dry run): key names only, no value, exact text', () => {
     const text = plan({ a, current, next: out.env, ...out, serverMiB: 3900 });
     assert.equal(
       text,
-      `Plan for production: deploy@203.0.113.10, https://app.example.com, ghcr.io/mihailorama/saas-agent-starter v1.0.0
+      `Plan for production: deploy@203.0.113.10, https://app.example.com, ghcr.io/mihailorama/orgfold v1.0.0
   components: core install, postgres install, s3 install, smtp connect, analytics install, llm connect, vault install, gate skip, openhands skip, bolt skip, allure skip, reportportal skip, crm skip
   profiles: + analytics, + vault
   env keys: ~ S3_ACCESS_KEY_ID (generated), + UMAMI_PUBLIC_URL, + UMAMI_DB_PASSWORD (generated), + UMAMI_APP_SECRET (generated), + UMAMI_ADMIN_PASSWORD (generated), + ANALYTICS_ORIGINS, + VAULT_PUBLIC_URL, + VAULT_DB_PASSWORD (generated), + VAULT_DATABASE_URL, + SSO_VAULTWARDEN_SECRET (generated), + SSO_VAULTWARDEN_REDIRECT_URIS, ~ STACK_MODES, - POSTHOG_HOST, - POSTHOG_KEY
@@ -409,4 +409,14 @@ test('a setting made by hand for a component (its keys) survives a re-run while 
   assert.equal(kept.VAULT_ADMIN_IPS, '192.0.2.10/32');
   a.components.vault = { mode: 'skip' };
   assert.equal(render(a, { VAULT_ADMIN_TOKEN: 'argon2-hash' }).env.VAULT_ADMIN_TOKEN, undefined);
+});
+
+test('the default images are the ones release.yml publishes (ghcr.io/<this repository>)', () => {
+  // The repo was renamed saas-agent-starter -> orgfold after v0.2.0: release.yml pushes to
+  // ghcr.io/${GITHUB_REPOSITORY}, so a stale default silently installed the old release.
+  const repo = 'ghcr.io/mihailorama/orgfold';
+  for (const f of ['scripts/infra.mjs', 'scripts/deploy.mjs']) {
+    const src = readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+    assert.match(src, new RegExp(`UPSTREAM(_REPO)? = '${repo}'`), f);
+  }
 });

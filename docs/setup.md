@@ -52,7 +52,7 @@ Setup asks only for the base; every other component is added afterwards, one at 
    (required: sign-in codes go by e-mail). Secrets are typed hidden and never shown again.
 6. Nothing about releases: it deploys the newest `v*` release of the images, looked up at each
    run (the plan names it). Until your fork publishes its own, the upstream
-   `ghcr.io/mihailorama/saas-agent-starter/{api,worker,web}` are used; `images.repo` in the answers
+   `ghcr.io/mihailorama/orgfold/{api,worker,web}` are used; `images.repo` in the answers
    file switches to yours, `images.version` pins a tag instead of `latest`.
 
 The run ends with a receipt: what is installed and where, what is connected, and what is not

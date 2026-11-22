@@ -37,7 +37,7 @@ the box, connected to an existing service, or skipped, and the template keeps ad
   with `sshd -T` and from the client.
 - **No Docker on the operator machine**: `deploy.mjs` resolves digests through the registry's
   HTTP API (`fetch`, anonymous or `REGISTRY_AUTH`). Images default to upstream's
-  (`ghcr.io/mihailorama/saas-agent-starter`) until a fork releases its own.
+  (`ghcr.io/mihailorama/orgfold`) until a fork releases its own.
 - **On-box sites as files**: `deploy/sites/<profile>.caddy`, shipped by the deploy for enabled
   profiles and imported by the Caddyfile, instead of commented blocks to uncomment. New prod
   profile `analytics` (Umami) and one-shots that create the vault and Umami databases.

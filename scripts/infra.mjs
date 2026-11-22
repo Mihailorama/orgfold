@@ -32,7 +32,7 @@ const read = (f) => readFileSync(join(ROOT, f), 'utf8');
 export const catalog = JSON.parse(read('config/components.json')).components;
 const byId = Object.fromEntries(catalog.map((c) => [c.id, c]));
 const models = JSON.parse(read('config/ai-models.json'));
-const UPSTREAM = 'ghcr.io/mihailorama/saas-agent-starter'; // until a fork has its own release
+const UPSTREAM = 'ghcr.io/mihailorama/orgfold'; // until a fork has its own release (the repo was saas-agent-starter up to v0.2.0)
 const SOPS_PLACEHOLDER = 'age1replace-with-your-public-key';
 const LABEL = {
   install: 'install on the server',

@@ -63,7 +63,7 @@ const ip = [undefined, '', '0.0.0.0'].includes(env.PUBLISH_IP) ? '127.0.0.1' : e
 
 // --- the release: one digest per app image ---
 // Upstream images until a fork has its own `v*` release (docs/setup.md).
-const UPSTREAM_REPO = 'ghcr.io/mihailorama/saas-agent-starter';
+const UPSTREAM_REPO = 'ghcr.io/mihailorama/orgfold';
 
 async function digest(name) {
   const pinned = process.env[`IMAGE_${name.toUpperCase()}`];

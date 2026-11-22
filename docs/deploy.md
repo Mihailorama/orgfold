@@ -104,7 +104,7 @@ What `deploy` does:
 1. Decrypts `deploy/env/production.enc.env`, resolves `IMAGE_REPO/{api,worker,web}:v1.4.0` to
    digests through the registry's HTTP API (no Docker needed on your machine; a private
    registry: `REGISTRY_AUTH=user:token`). `IMAGE_REPO` defaults to the upstream images,
-   `ghcr.io/mihailorama/saas-agent-starter`, until your fork has its own release.
+   `ghcr.io/mihailorama/orgfold`, until your fork has its own release.
 2. **Stage** (nothing running changes): writes the new `compose.yaml`, `Caddyfile`, the sites
    of the enabled profiles (`deploy/sites/<profile>.caddy` -> `sites/`), Temporal files,
    `secrets.env` and `release.env` as `*.next` on the server and pulls the images. A
