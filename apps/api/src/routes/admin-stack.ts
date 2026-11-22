@@ -219,12 +219,11 @@ export const adminStackRoutes: FastifyPluginAsyncZod<{ redis: Redis }> = async (
           return {
             id: c.id,
             title: c.title,
+            // find() keeps the literal type; tsc widens a narrowed `c.group` to string here.
             group:
               c.id === 'core'
                 ? ('app' as const)
-                : c.group === 'base' || c.group === 'product'
-                  ? c.group
-                  : ('tools' as const),
+                : ((['base', 'product'] as const).find((g) => g === c.group) ?? ('tools' as const)),
             // Doc pointers help at setup, not here: "(Vaultwarden; docs/secrets.md)" -> "(Vaultwarden)".
             description: c.description
               .replace(/;\s*docs\/[\w./-]+/g, '')

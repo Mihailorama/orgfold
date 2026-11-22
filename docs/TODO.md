@@ -1,5 +1,10 @@
 # Known limitations / backlog
 
+- **Typecheck: tsc 7 runs only on release tags** (ORGFOLD-120) (ADR 0011). On v0.3.0, tsc rejected
+  `admin-stack.ts`: tsrs kept the literal type of a narrowed `c.group` (`=== 'base' || === 'product'`),
+  tsc widened it to string. Fixed in code with `find()` over a const tuple, but it surfaced only after
+  the tag. Fix: run `pnpm typecheck` (tsc, 4-6 s for apps/api) in PR CI or on the release PR, and
+  report the case to tsrs upstream.
 - **No display-name setting** (SAASSTARTER-76) (ADR 0033). A code sign-up names the account after the address's
   local part (`ada@example.com` -> `ada`), which mails, invitations and the user menu show. Fix:
   a "Name" field on a profile/settings page calling `authClient.updateUser({ name })`
