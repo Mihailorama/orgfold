@@ -583,7 +583,8 @@ Details: docs/ui.md, DESIGN.md, ADR 0023. Look at `/dev/ui` (`pnpm dev`) before 
   (docs/ui.md "Visual checks").
 - When the `impeccable` skill is installed (`npx impeccable install`, docs/ui.md), run
   `/impeccable critique` and `/impeccable audit` on the screens you changed and fix what they
-  find. Do not vendor the skill into this repository.
+  find. With `unslop` installed (docs/ui.md), also run `/unslop` on them in polish mode (keep
+  DESIGN.md, fix only what its audit finds). Do not vendor either skill into this repository.
 - Optional, only when the user asks for it: `/ui-council` (`pnpm ui:council`, docs/ui.md "UI
   council") lets several models score blinded screenshots, round after round, until each rates
   every category at the target. It costs subscription hours, so never start it on your own. When

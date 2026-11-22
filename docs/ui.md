@@ -53,7 +53,8 @@ lighthouse CI job checks that the build contains no gallery code).
      small screens (`meta: { className: 'hidden md:table-cell' }`);
    - [ ] copy: sentence case, verbs on buttons, no blame, no exclamation marks (DESIGN.md).
 5. **Run the checks** below; with the `impeccable` skill installed, run
-   `/impeccable critique <screen>` and `/impeccable audit <screen>` on new or changed screens.
+   `/impeccable critique <screen>` and `/impeccable audit <screen>` on new or changed screens;
+   with `unslop` installed, `/unslop <screen>` in polish mode (below).
 
 ## Dark patterns
 
@@ -208,3 +209,21 @@ npx impeccable install       # skills for Claude Code, Codex, Cursor, ... (promp
 Then in Claude Code: `/impeccable critique apps/web/src/pages/projects.tsx`,
 `/impeccable audit`, `/impeccable polish <target>`. CI runs only the detector binary
 (pinned version and SHA-256 in `ui.yml`), never a model.
+
+## Install the unslop skill (optional, for agents)
+
+[unslop](https://github.com/heydamir/unslop) by Damir Sokolovsky (CC BY 4.0) finds what makes a
+screen look AI-generated (hue gradients, glows, emoji labels, uppercase tracked labels, shouty copy,
+off-grid spacing, looping motion), then fixes it in nine passes: spacing, color, icons, copy, type,
+layout, details, visuals, motion. It is not vendored here (it ships image examples, and media stays
+out of git). `.claude/settings.json` registers its marketplace (`heydamir`) but does not enable it:
+
+```sh
+claude plugin install unslop@heydamir --scope local   # Claude Code, this project, for you only
+# Codex: copy skills/unslop of the repository into ~/.agents/skills/
+```
+
+Here, run it in **polish mode**: the direction is DESIGN.md and the tokens, so it fixes only what its
+audit finds and never invents a new palette, typeface or hero image. It asks before any paid image
+generation; app screens need none. Its findings that conflict with DESIGN.md go to DESIGN.md first
+(UI rules in AGENTS.md), not into one screen.

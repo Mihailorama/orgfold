@@ -62,6 +62,12 @@
           }
         ]
       }
+    },
+    "heydamir": {
+      "source": {
+        "source": "github",
+        "repo": "heydamir/unslop"
+      }
     }
   }
 }
