@@ -141,7 +141,8 @@ images); before a push, screenshots are compared with `main` rendered on the sam
 changed screen passes only if the change declares it in `apps/web/.visual-intent`: no human
 review, no screenshots in git. CI runs Lighthouse on the public pages and the
 [impeccable](https://github.com/pbakaus/impeccable) design detector.
-Agents with the impeccable skill installed read [PRODUCT.md](PRODUCT.md) and DESIGN.md.
+Agents with the impeccable skill installed read [PRODUCT.md](PRODUCT.md) and DESIGN.md;
+[unslop](https://github.com/heydamir/unslop) removes AI-looking UI the same way (docs/ui.md).
 
 ## Deploy
 
