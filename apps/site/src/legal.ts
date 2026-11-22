@@ -21,6 +21,8 @@ export type Processor = {
   /** Component modes (deploy answers) in which the server uses it too; without `env`: any but skip. */
   modes?: string[];
   cookies?: Cookie[];
+  /** Runs for every visitor before any choice: no cookies, no identifiers (Umami). */
+  withoutConsent?: boolean;
 };
 export type LegalConfig = {
   template: boolean;
@@ -167,9 +169,10 @@ export function legalDocs(
     ? `${product} is for businesses and professionals. Do not use it as a consumer or if you are under 18.`
     : `You must be at least ${config.age.minimum} years old to create an account; sign-up asks you to confirm it. We do not knowingly collect data of younger children. If you believe a child gave us personal data, write to ${c.privacyEmail} and we will delete it.`;
   const cookieTools = processors.filter((p) => p.cookies?.length);
-  const consentTools = processors.filter((p) =>
-    ['analytics', 'marketing', 'functional'].includes(p.category),
+  const consentTools = processors.filter(
+    (p) => ['analytics', 'marketing', 'functional'].includes(p.category) && !p.withoutConsent,
   );
+  const freeTools = processors.filter((p) => p.withoutConsent);
   const models = pricingModels(plans);
   const subscription = models.has('flat') || models.has('per_seat');
 
@@ -388,12 +391,24 @@ export function legalDocs(
       heading: 'Tools that need your consent',
       paragraphs: [
         consentTools.length
-          ? 'These tools load only after you agree, or not at all where they are cookieless and the law allows it:'
+          ? 'These tools load only after you agree:'
           : 'This deployment uses no analytics, marketing or third-party tools that need consent.',
       ],
       generated: true,
       items: consentTools.map((p) => `${p.name}: ${p.purpose}`),
     },
+    ...(freeTools.length
+      ? [
+          {
+            heading: 'Analytics without cookies',
+            paragraphs: [
+              'These tools run for every visitor, before any choice, because they set no cookies and keep no personal identifiers:',
+            ],
+            generated: true,
+            items: freeTools.map((p) => `${p.name}: ${p.purpose}`),
+          },
+        ]
+      : []),
   ]);
 
   const imprint = doc('imprint', [

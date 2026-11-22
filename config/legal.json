@@ -23,7 +23,7 @@
       "version": "2026-11-10",
       "effective": "2026-11-10"
     },
-    "cookies": { "title": "Cookie policy", "version": "2026-11-10", "effective": "2026-11-10" },
+    "cookies": { "title": "Cookie policy", "version": "2026-11-22", "effective": "2026-11-22" },
     "imprint": { "title": "Business details", "version": "2026-11-10", "effective": "2026-11-10" }
   },
   "refunds": {
@@ -152,7 +152,8 @@
       "env": ["VITE_UMAMI_SCRIPT_URL", "VITE_UMAMI_WEBSITE_ID"],
       "modes": ["install"],
       "purpose": "Counts page views and events without cookies or personal identifiers.",
-      "data": "Page path, referrer, browser type; no cookies."
+      "data": "Page path, referrer, browser type; no cookies.",
+      "withoutConsent": true
     },
     {
       "id": "ga4",

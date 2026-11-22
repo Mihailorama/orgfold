@@ -102,6 +102,15 @@ test('refund terms follow the pricing models; the cookie policy lists only tools
   assert.doesNotMatch(JSON.stringify(legalDocs(config, [], plans).cookies), /PostHog/);
 });
 
+test('cookieless analytics that run without consent are not listed as needing it', () => {
+  const umami = config.processors.find((p) => p.id === 'umami');
+  const sections = legalDocs(config, [umami, posthog], plans).cookies.sections;
+  const items = (h) => sections.find((s) => s.heading === h)?.items?.join() ?? '';
+  assert.match(items('Tools that need your consent'), /PostHog/);
+  assert.doesNotMatch(items('Tools that need your consent'), /Umami/);
+  assert.match(items('Analytics without cookies'), /Umami/);
+});
+
 test('a text change under an accepted version fails; a new version asks for its lock line', () => {
   const docs = legalDocs(config, [], plans);
   const lock = Object.fromEntries(

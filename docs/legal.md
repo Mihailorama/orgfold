@@ -60,7 +60,9 @@ lawyer must review them for every country the product is sold in.
 
 Nothing in the policies lists tools by hand. The catalog of what the stack _can_ use is
 `processors` in `config/legal.json` (one entry per tool: component, purpose, data, cookies, the
-`env` keys that turn a browser tool on, and the component `modes` in which the server uses it).
+`env` keys that turn a browser tool on, the component `modes` in which the server uses it, and
+`withoutConsent` for a cookieless tool that runs before any choice, like Umami: the cookie policy
+lists it apart from the tools that need consent).
 A page lists a processor when:
 
 - in the browser: all its `env` keys are set in the site build (the same `VITE_*` the web is
