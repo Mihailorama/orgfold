@@ -1,5 +1,7 @@
+import { spawn } from 'node:child_process';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
-import { chmod, copyFile, mkdir, mkdtemp, readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -65,7 +67,18 @@ async function subscription(
   for (const [name, file] of Object.entries(s.env ?? {})) {
     env[name] = (await readFile(file, 'utf8')).trim();
   }
-  return { name: s.name, concurrency: s.concurrency ?? 1, env, home };
+  return { name: s.name, concurrency: s.concurrency ?? 1, env, home, files: s.files };
+}
+
+/** A CLI may refresh its login inside HOME (Codex rotates the refresh token): keep the new one,
+ * or the next start would copy a revoked one. */
+async function persist(sub: Subscription) {
+  for (const [rel, src] of Object.entries(sub.files ?? {})) {
+    const now = await readFile(join(sub.home, rel)).catch(() => null);
+    if (now && !now.equals(await readFile(src).catch(() => Buffer.alloc(0)))) {
+      await writeFile(src, now, { mode: 0o600 }).catch(() => undefined); // read-only mount: keep
+    }
+  }
 }
 
 export async function load(config: Config): Promise<Map<string, Cli>> {
@@ -135,7 +148,70 @@ function parseRequest(raw: unknown): { model: string; messages: Message[] } | nu
   return ok && messages.length ? { model: r.model, messages: messages as Message[] } : null;
 }
 
-export function createApp(clis: Map<string, Cli>, opts: { token: string; timeoutMs: number }) {
+/**
+ * Sign-ins from the operator console (docs/admin.md "Connect a model"), behind the same bearer
+ * token: a Claude token from `claude setup-token`, or a ChatGPT sign-in that Codex runs here with
+ * a device code the operator enters in their browser. Each login is written to the file the
+ * config names for the CLI's first subscription (mode 600), then the CLIs are loaded again.
+ * Tokens never leave this container and are never logged.
+ */
+type Device = { state: 'pending' | 'done' | 'failed'; url?: string; code?: string };
+const loginFile = (config: Config, cli: string) => {
+  const s = config.clis[cli]?.subscriptions[0];
+  return cli === 'claude' ? s?.env?.CLAUDE_CODE_OAUTH_TOKEN : s?.files?.['.codex/auth.json'];
+};
+
+function deviceLogin(bin: string, file: string, onDone: () => Promise<void>) {
+  const device: Device = { state: 'pending' };
+  const ready = new Promise<Device>((resolve) => {
+    void (async () => {
+      const home = await mkdtemp(join(tmpdir(), 'llm-cli-login-'));
+      const env = { PATH: process.env.PATH ?? '', HOME: home, CODEX_HOME: home, LANG: 'C.UTF-8' };
+      const child = spawn(bin, ['login', '--device-auth'], {
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let out = '';
+      const seen = (d: Buffer) => {
+        out += d.toString('utf8'); // colour codes around them do not match [\w./-]
+        device.url ??= out.match(/https:\/\/[\w./-]+/)?.[0];
+        device.code ??= out.match(/(?<![A-Z0-9])[A-Z0-9]{4}-[A-Z0-9]{4,6}(?![A-Z0-9])/)?.[0];
+        if (device.url && device.code) resolve(device);
+      };
+      child.stdout.on('data', seen);
+      child.stderr.on('data', seen);
+      const timer = setTimeout(() => child.kill('SIGTERM'), 16 * 60_000); // the code expires in 15
+      child.on('close', async (code) => {
+        clearTimeout(timer);
+        try {
+          if (code !== 0) throw new Error(`exit ${code}`);
+          await mkdir(dirname(file), { recursive: true });
+          await copyFile(join(home, 'auth.json'), file);
+          await chmod(file, 0o600);
+          await onDone(); // served before the console sees "done"
+          device.state = 'done';
+        } catch (err) {
+          device.state = 'failed';
+          log('device login failed', { error: (err as Error).message.slice(0, 60) });
+        } finally {
+          await rm(home, { recursive: true, force: true });
+          resolve(device);
+        }
+      });
+    })();
+  });
+  return { device, ready };
+}
+
+export function createApp(
+  initial: Map<string, Cli>,
+  opts: { token: string; timeoutMs: number; config?: Config },
+) {
+  let clis = initial;
+  let device: Device | undefined;
+  const reload = async () => {
+    if (opts.config) clis = await load(opts.config);
+  };
   const want = createHash('sha256').update(opts.token).digest();
   const authorized = (req: IncomingMessage) => {
     const got = req.headers.authorization?.match(/^Bearer\s+(\S+)$/i)?.[1] ?? '';
@@ -145,6 +221,55 @@ export function createApp(clis: Map<string, Cli>, opts: { token: string; timeout
   return createServer(async (req, res) => {
     if (req.method === 'GET' && req.url === '/healthz') {
       return send(res, 200, { ok: true, clis: [...clis.keys()] });
+    }
+    const login = req.url?.match(/^\/logins(?:\/(claude|codex))?$/);
+    if (login && opts.config) {
+      if (!authorized(req)) return fail(res, 401, 'authentication_error', 'invalid token');
+      const config = opts.config;
+      const cli = login[1];
+      const file = cli ? loginFile(config, cli) : undefined;
+      if (req.method === 'GET' && !cli) {
+        const has = (c: string) =>
+          Boolean(loginFile(config, c) && existsSync(loginFile(config, c)!));
+        return send(res, 200, {
+          claude: has('claude'),
+          codex: has('codex'),
+          device: device ?? null,
+        });
+      }
+      if (!file) return fail(res, 404, 'not_found', 'no subscription configured for this CLI');
+      if (req.method === 'DELETE') {
+        await rm(file, { force: true });
+        await reload();
+        return send(res, 200, { ok: true });
+      }
+      if (req.method === 'PUT' && cli === 'claude') {
+        const raw = (await body(req).catch(() => null)) as { token?: unknown } | null;
+        const token = typeof raw?.token === 'string' ? raw.token.trim() : '';
+        if (!/^[A-Za-z0-9._-]{20,512}$/.test(token)) {
+          return fail(
+            res,
+            400,
+            'invalid_request_error',
+            'expected the token claude setup-token prints',
+          );
+        }
+        await mkdir(dirname(file), { recursive: true });
+        await writeFile(file, token, { mode: 0o600 });
+        await reload();
+        return send(res, 200, { ok: true });
+      }
+      if (req.method === 'POST' && cli === 'codex') {
+        if (device?.state !== 'pending') {
+          const started = deviceLogin(config.clis.codex?.bin ?? 'codex', file, reload);
+          device = started.device;
+          await Promise.race([started.ready, new Promise((r) => setTimeout(r, 30_000))]);
+        }
+        return device.url && device.code
+          ? send(res, 200, device)
+          : fail(res, 502, 'api_error', 'Codex did not show a sign-in code');
+      }
+      return fail(res, 404, 'not_found', 'unknown route');
     }
     const name = req.url?.match(/^\/([a-z0-9_-]+)\/v1\/chat\/completions$/)?.[1];
     const cli = name ? clis.get(name) : undefined;
@@ -169,6 +294,8 @@ export function createApp(clis: Map<string, Cli>, opts: { token: string; timeout
         });
       });
       log('cli call', { id, cli: name, subscription: used, ms: Date.now() - started });
+      const sub = cli.vendor.subs.find((x) => x.name === used);
+      if (sub) await persist(sub);
       const usage =
         result.inputTokens !== null && result.outputTokens !== null
           ? {

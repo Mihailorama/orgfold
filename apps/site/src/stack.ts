@@ -65,6 +65,20 @@ export const stack: { group: string; tools: Tool[] }[] = [
     group: 'Work and AI',
     tools: [
       {
+        name: 'OpenHands',
+        role: 'agents build your internal apps',
+        license: 'MIT',
+        images: ['ghcr.io/openhands/agent-canvas'],
+        href: 'https://github.com/OpenHands/OpenHands',
+      },
+      {
+        name: 'bolt.diy',
+        role: 'app prototypes in the browser',
+        license: 'MIT (+ WebContainers terms)',
+        images: ['ghcr.io/stackblitz-labs/bolt.diy'],
+        href: 'https://github.com/stackblitz-labs/bolt.diy',
+      },
+      {
         name: 'Temporal',
         role: 'durable background jobs',
         license: 'MIT',
@@ -187,6 +201,29 @@ export const stack: { group: string; tools: Tool[] }[] = [
         href: 'https://glitchtip.com',
         connect: 'Sentry, same SDKs, only the DSN changes',
       },
+      {
+        name: 'Allure',
+        role: 'test reports for every CI run',
+        license: 'Apache-2.0',
+        images: ['frankescobar/allure-docker-service'],
+        href: 'https://allurereport.org',
+      },
+      {
+        name: 'ReportPortal',
+        role: 'test results server, failure triage',
+        license: 'Apache-2.0',
+        images: [
+          'reportportal/service-api',
+          'reportportal/service-ui',
+          'reportportal/service-index',
+          'reportportal/service-authorization',
+          'reportportal/service-jobs',
+          'reportportal/service-auto-analyzer',
+          'reportportal/migrations',
+          'opensearchproject/opensearch',
+        ],
+        href: 'https://reportportal.io',
+      },
     ],
   },
   {
@@ -264,6 +301,13 @@ export const stack: { group: string; tools: Tool[] }[] = [
     group: 'Trust',
     tools: [
       {
+        name: 'oauth2-proxy',
+        role: 'staff sign-in in front of tools',
+        license: 'MIT',
+        images: ['quay.io/oauth2-proxy/oauth2-proxy'],
+        href: 'https://github.com/oauth2-proxy/oauth2-proxy',
+      },
+      {
         name: 'Vaultwarden',
         role: 'secrets vault',
         license: 'AGPL-3.0',
@@ -293,4 +337,7 @@ export const notShown = [
   'stripe/stripe-mock',
   'ubuntu',
   'registry',
+  // ReportPortal's own router and queue, shown as part of ReportPortal.
+  'traefik',
+  'rabbitmq',
 ];

@@ -11,7 +11,8 @@
 - Out of scope / must not be used for: running anything, choosing secrets, acting on a team chat
   request (the team chat only links to the console).
 - Contours and models: `stack.plan` in `config/ai-models.json`; selected by
-  `AI_STACK_PLAN_PROVIDER` / `AI_STACK_PLAN_MODEL` (unset: off).
+  `AI_STACK_PLAN_PROVIDER` / `AI_STACK_PLAN_MODEL` (unset: off); `pnpm run infra` sets them to the
+  model chosen at setup (subscription or API key, docs/setup.md).
 - Prompt template id and current version: `stack.plan/system` v1 (`prompts/`, pinned in
   `prompts/lock.json`).
 - Input data and legal basis: the operator's request, the catalog and how each component runs now
@@ -27,7 +28,8 @@
   figure in the reply, a missed dependency (infra's own validation refuses an install whose
   `requires` is not met). Unparsable output shows "No plan". Checked with unit tests (fake
   model) and the golden set `evals/stack.plan/` (judge `prompts/judge/stack.plan.v1.md`).
-- Logging: one `ai_calls` row per call under `STACK_AI_ORG_ID` (`actor_id` = the operator); the
+- Logging: one `ai_calls` row per call under `STACK_AI_ORG_ID`, or the "Operator console"
+  organization the worker makes on first use when it is empty (`actor_id` = the operator); the
   approval is an `operator.stack_plan.approved` platform audit row; content in the
   `AI_CONTENT_BUCKET` S3 objects for `AI_CONTENT_RETENTION_DAYS`.
 - How affected people can contest a result: not applicable (no person is affected); operators

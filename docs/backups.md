@@ -60,6 +60,14 @@ restore check within a minute, then the schedule below. Watch it with
   `BACKUP ... TO S3` if that history matters.
 - **Chatwoot's queue** (`support` profile): Sidekiq jobs in Redis db 2 (jobs in flight, e.g.
   a notification email, are lost). Its conversations and attachments are covered (above).
+- **App builders** (docs/app-builders.md): OpenHands' `openhands_state` (settings, model keys,
+  conversations) and `openhands_projects` (the code its agents write) volumes. Push the apps you
+  keep to a git repository from OpenHands; that is their backup. bolt.diy keeps projects in the
+  visitor's browser.
+- **Test reports** (docs/test-reports.md): Allure's `allure_projects` volume and ReportPortal's
+  own Postgres, OpenSearch and file volumes (`rp_postgres`, `rp_opensearch`, `rp_storage`,
+  `rp_analyzer`). Test history can be rebuilt by the next CI runs; ReportPortal's dashboards,
+  users and triage decisions cannot. Dump `rp_postgres` with `pg_dump` if they matter.
 - **Marketing profile files**: Postiz uploads (`postiz-uploads` volume, `STORAGE_PROVIDER=local`)
   and SerpBear's SQLite data (`serpbear-data` volume). Postiz's database is covered (above).
   Copy those two volumes yourself if they matter, or point Postiz storage at a bucket listed in

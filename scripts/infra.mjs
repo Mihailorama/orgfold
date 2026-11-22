@@ -2,8 +2,16 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 // One-command infrastructure setup (docs/setup.md, ADR 0032). Components: config/components.json.
@@ -51,26 +59,67 @@ const toDotenv = (env) =>
     .map(([k, v]) => `${k}=${v}\n`)
     .join('');
 
+/**
+ * Subscriptions a model can run on (llm-cli, docs/llm-providers.md): the secret that holds the
+ * login and the file llm-cli reads it from (infra/llm-cli/config.json). Logins happen on this
+ * machine, like any agent's setup: `claude setup-token`, `codex login --device-auth`.
+ */
+const LOGINS = {
+  claude: {
+    key: 'LLM_CLI_CLAUDE_TOKEN',
+    file: 'claude-1.token',
+    prompt: 'Paste the token claude setup-token printed',
+  },
+  codex: { key: 'LLM_CLI_CODEX_AUTH', file: 'codex-1.auth.json' },
+};
+const PROVIDER_LABEL = {
+  claude_cli: 'Claude subscription (Pro or Max)',
+  codex_cli: 'ChatGPT subscription (Codex)',
+  anthropic: 'Anthropic API key',
+  openai: 'OpenAI API key',
+  gemini: 'Google Gemini API key',
+  openrouter: 'OpenRouter API key (many vendors)',
+};
+/** Files the llm-cli image is built from, on the server: it holds vendor CLIs, never published. */
+const LLM_CLI_FILES = [
+  'services/llm-cli/Dockerfile',
+  ...readdirSync(join(ROOT, 'services/llm-cli/src')).map((f) => `services/llm-cli/src/${f}`),
+  'infra/llm-cli/config.json',
+];
+const llmCliTag = (project) =>
+  `${project}-llm-cli:${createHash('sha256')
+    .update(LLM_CLI_FILES.map(read).join('\0'))
+    .digest('hex')
+    .slice(0, 12)}`;
+
 export const modeOf = (a, c) =>
   c.modes.length === 1 ? c.modes[0] : (a.components?.[c.id]?.mode ?? 'skip');
 
 /** Allowed values of the LLM fields, from config/ai-models.json (API providers only). */
 function choices(key, ca) {
   if (key === 'AI_CONTOUR') return Object.keys(models.contours);
-  const rows = (models.contours[ca.AI_CONTOUR] ?? []).filter(
-    (r) => r.purposes.includes('project.summary') && models.providers[r.provider]?.kind !== 'cli',
-  );
+  const rows = (models.contours[ca.AI_CONTOUR] ?? []).filter((r) => {
+    const p = models.providers[r.provider];
+    return r.purposes.includes('project.summary') && p && (p.kind !== 'cli' || p.cli in LOGINS);
+  });
   if (key === 'AI_PROJECT_SUMMARY_PROVIDER') return [...new Set(rows.map((r) => r.provider))];
   if (key === 'AI_PROJECT_SUMMARY_MODEL')
     return rows.filter((r) => r.provider === ca.AI_PROJECT_SUMMARY_PROVIDER).map((r) => r.model);
 }
 
 /** A connect field; `@apiKey` becomes the chosen provider's <ID>_API_KEY (and <ID>_BASE_URL),
- * the naming config/ai-models.json follows (scripts/infra.test.mjs checks it). */
+ * the naming config/ai-models.json follows (scripts/infra.test.mjs checks it), or for a
+ * subscription its login (LOGINS). */
 export function expandField(f, ca) {
   if (f.key !== '@apiKey') return [f];
   const id = String(ca.AI_PROJECT_SUMMARY_PROVIDER ?? '');
   const p = models.providers[id] ?? {};
+  if (p.kind === 'cli') {
+    const l = LOGINS[p.cli];
+    return l
+      ? [{ key: l.key, prompt: l.prompt ?? `${p.cli} login`, secret: true, login: p.cli }]
+      : [];
+  }
   const env = id.toUpperCase();
   return [
     ...(p.baseUrlEnv
@@ -93,6 +142,10 @@ export function validateAnswers(a) {
   need(/^([a-z0-9-]+\.)*[a-z0-9-]+$/i.test(a.domain ?? ''), 'domain: e.g. app.example.com');
   need(a.tls === 'internal' || /^[^@\s]+@[^@\s]+$/.test(a.tls ?? ''), 'tls: e-mail or internal');
   need(/^[a-z0-9][\w.:/-]*$/.test(a.images?.repo ?? ''), 'images.repo: registry/owner/name');
+  need(
+    a.operators === undefined || /^[^@\s,]+@[^@\s,]+(,[^@\s,]+@[^@\s,]+)*$/.test(a.operators),
+    'operators: e-mail addresses, comma-separated',
+  );
   need(/^\w[\w.-]*$/.test(a.images?.version ?? ''), 'images.version: a release tag, e.g. v1.0.0');
   for (const c of catalog) {
     const ca = a.components?.[c.id];
@@ -185,6 +238,35 @@ export function render(a, current = {}, { rotate = [], secrets = {}, previous } 
       else env[f.key] = v;
     }
   }
+  // A model set here (`add llm`, --yes) also runs the stack console's agent, when the registry
+  // allows it there. Usually the operator connects it in the console instead (docs/admin.md).
+  owned.add('AI_STACK_PLAN_PROVIDER').add('AI_STACK_PLAN_MODEL');
+  for (const l of Object.values(LOGINS)) owned.add(l.key);
+  const llm = a.components?.llm ?? {};
+  if (modeOf(a, byId.llm) === 'connect') {
+    const [provider, model] = [llm.AI_PROJECT_SUMMARY_PROVIDER, llm.AI_PROJECT_SUMMARY_MODEL];
+    const row = (models.contours[llm.AI_CONTOUR] ?? []).find(
+      (r) => r.provider === provider && r.model === model,
+    );
+    if (row?.purposes.includes('stack.plan')) {
+      env.AI_STACK_PLAN_PROVIDER = provider;
+      env.AI_STACK_PLAN_MODEL = model;
+    }
+  }
+  // llm-cli always runs: the console's first step signs in to a Claude or ChatGPT subscription
+  // there (its image holds vendor CLIs, so it is built on the server, never published).
+  profiles.push('llm-cli');
+  generated.push('LLM_CLI_TOKEN');
+  const keepToken = current.LLM_CLI_TOKEN && !rotate.includes('LLM_CLI_TOKEN');
+  env.LLM_CLI_TOKEN = keepToken ? current.LLM_CLI_TOKEN : randomBytes(32).toString('hex');
+  env.IMAGE_LLM_CLI = llmCliTag(a.project);
+  // The worker refuses every model without a contour; the console's choice needs one too.
+  env.AI_CONTOUR ||= Object.keys(models.contours)[0];
+  // The operator console's admins (docs/admin.md), asked at setup.
+  if (a.operators) {
+    owned.add('OPERATOR_EMAILS');
+    env.OPERATOR_EMAILS = a.operators;
+  }
   // Computed here, last: a value kept from `keys` must not move it (a re-run rewrites nothing).
   delete env.COMPOSE_PROFILES;
   env.COMPOSE_PROFILES = profiles.join(',');
@@ -227,7 +309,8 @@ export function freshEnvError({ envExists, savedAnswers, serverHasEnv, envFile }
 }
 
 const ramOf = (a) =>
-  catalog.reduce((sum, c) => sum + (modeOf(a, c) === 'install' ? (c.install?.ramMiB ?? 0) : 0), 0);
+  catalog.reduce((sum, c) => sum + (modeOf(a, c) === 'install' ? (c.install?.ramMiB ?? 0) : 0), 0) +
+  byId['llm-cli'].install.ramMiB; // always on: subscription sign-ins (render)
 
 /** The plan: profiles and env KEY NAMES added (+), changed (~), removed (-), and RAM. */
 export function plan({ a, current, next, generated, missing = [], serverMiB, release }) {
@@ -263,7 +346,13 @@ export function plan({ a, current, next, generated, missing = [], serverMiB, rel
       : []),
     `  RAM budget (mem_limit): ${gib(ram)}${serverMiB ? ` of ${gib(serverMiB)} on the server` : ', server RAM unknown'}`,
   ];
-  if (serverMiB && ram > serverMiB * 0.9) lines.push('  WARNING: that is more than 90 % of it');
+  // Limits are ceilings (idle use is about a third, docs/STACK.md), so this advises, never stops.
+  if (serverMiB && ram > serverMiB * 0.9)
+    lines.push(
+      '  NOTE: the limits add up to more than 90 % of the server. It starts, but under load or with',
+      '  more components later a bigger server is recommended: resize it at your provider (data stays),',
+      '  or run heavy components on a second server and connect them.',
+    );
   return lines.join('\n');
 }
 
@@ -411,6 +500,69 @@ function serverMiB(env) {
   return r.status === 0 ? Number(r.stdout.trim()) : undefined;
 }
 
+/** Subscriptions: build the llm-cli image on the server (check-then-act) and put the logins
+ * where it reads them, owned by its user, mode 600. Values travel on stdin only. */
+function llmCli(env) {
+  const tag = env.IMAGE_LLM_CLI;
+  const on = (cmd, opts) => ssh(env.DEPLOY_HOST, `cd ${q(env.DEPLOY_PATH)} && ${cmd}`, opts);
+  if (on(`docker image inspect ${q(tag)} >/dev/null 2>&1`, { capture: true }).status !== 0) {
+    console.log(`  building ${tag} on the server (vendor CLIs from npm, never published)`);
+    const tar = spawnSync('tar', ['-c', '-C', ROOT, ...LLM_CLI_FILES], { maxBuffer: 1 << 28 });
+    if (tar.status !== 0) die('tar of services/llm-cli failed');
+    const r = on(`docker build -q -t ${q(tag)} -f services/llm-cli/Dockerfile -`, {
+      input: tar.stdout,
+    });
+    if (r.status !== 0) die('building llm-cli on the server failed; run again');
+  }
+  on('mkdir -p llm-cli-secrets');
+  for (const l of Object.values(LOGINS)) {
+    const value = env[l.key];
+    const file = `/s/${l.file}`;
+    const script = value ? `umask 077; cat > ${file}; chown node:node /s ${file}` : `rm -f ${file}`;
+    const r = on(
+      `docker run --rm -i --user 0 --entrypoint sh -v "$PWD/llm-cli-secrets:/s" ${q(tag)} -c ${q(script)}`,
+      {
+        input:
+          l.key === 'LLM_CLI_CODEX_AUTH' && value ? Buffer.from(value, 'base64') : (value ?? ''),
+        capture: true,
+      },
+    );
+    if (r.status !== 0) die(`llm-cli: could not write ${l.file} on the server`);
+  }
+}
+
+/** A subscription login on this machine, as each vendor's CLI does it (pinned like the image). */
+function login(cli) {
+  const version = (arg) =>
+    new RegExp(`ARG ${arg}=(\\S+)`).exec(read('services/llm-cli/Dockerfile'))?.[1];
+  const run = (bin, pkg, args, env) => {
+    const local = spawnSync(bin, ['--version'], { stdio: 'ignore' }).status === 0;
+    const [cmd, argv] = local ? [bin, args] : ['npx', ['-y', pkg, ...args]];
+    return spawnSync(cmd, argv, { stdio: 'inherit', env: { ...process.env, ...env } }).status;
+  };
+  if (cli === 'claude') {
+    console.log('Claude opens a sign-in page, then prints a token. Copy it, paste it below.');
+    run('claude', `@anthropic-ai/claude-code@${version('CLAUDE_CODE_VERSION')}`, ['setup-token']);
+    return undefined; // the token is pasted at the prompt that follows
+  }
+  // Codex: a device-code sign-in into a throwaway CODEX_HOME, so your own login is untouched.
+  const home = mkdtempSync(join(tmpdir(), 'codex-login-'));
+  try {
+    const status = run(
+      'codex',
+      `@openai/codex@${version('CODEX_VERSION')}`,
+      ['login', '--device-auth'],
+      {
+        CODEX_HOME: home,
+      },
+    );
+    if (status !== 0 || !existsSync(join(home, 'auth.json'))) die('codex login did not finish');
+    return readFileSync(join(home, 'auth.json')).toString('base64');
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+}
+
 function verify(a, env, { org, mail }) {
   const at = (cmd) => ssh(env.DEPLOY_HOST, `cd ${q(env.DEPLOY_PATH)} && ${cmd}`, { capture: true });
   const port = env.HTTPS_PORT ?? '443';
@@ -493,15 +645,17 @@ async function ask(a, current, secrets, only, fixed) {
       ca.mode = fixed?.[c.id] ?? c.modes[0];
     } else ca.mode = ok(await p.select({ message, options, initialValue }));
     if (ca.mode !== 'connect') return;
+    if (c.offers?.length) p.log.info(offersText(c.offers));
     for (const f of (c.connect ?? []).flatMap((f) => expandField(f, ca))) {
       if (!f.secret) {
         const list = choices(f.key, ca);
+        const label = (value) => ({ value, label: PROVIDER_LABEL[value] ?? value });
         const initial = ca[f.key] ?? f.default?.replace(/\{(\w+)\}/g, (_, k) => ca[k] ?? '');
         ca[f.key] = list
           ? ok(
               await p.select({
                 message: f.prompt,
-                options: list.map((value) => ({ value })),
+                options: list.map(label),
                 initialValue: list.includes(ca[f.key]) ? ca[f.key] : list[0],
               }),
             )
@@ -510,7 +664,9 @@ async function ask(a, current, secrets, only, fixed) {
         secrets[f.key] === undefined &&
         (!current[f.key] || !ok(await p.confirm({ message: `Keep the current ${f.key}?` })))
       ) {
-        secrets[f.key] = ok(await p.password({ message: f.prompt, validate: check(f.validate) }));
+        secrets[f.key] =
+          (f.login && login(f.login)) ??
+          ok(await p.password({ message: f.prompt, validate: check(f.validate) }));
       }
     }
   };
@@ -524,6 +680,11 @@ async function ask(a, current, secrets, only, fixed) {
     a.product.description = await text(
       'Describe it in a sentence or two (landing page, search results)',
       a.product.description ?? '',
+    );
+    a.operators = await text(
+      'Your e-mail: you sign in to the operator console with it (comma-separate more)',
+      a.operators ?? current.OPERATOR_EMAILS ?? '',
+      '^[^@\\s,]+@[^@\\s,]+(,[^@\\s,]+@[^@\\s,]+)*$',
     );
   }
   if (only) await component(byId[only]);
@@ -554,6 +715,10 @@ export function command(words) {
   const planId = cmd === 'apply' ? rest.splice(i, 1)[0] : undefined;
   return { cmd, only, planId, words: rest };
 }
+
+/** The value after a flag, or undefined when the flag is absent (never another argument). */
+export const option = (argv, name) =>
+  argv.includes(name) ? argv[argv.indexOf(name) + 1] : undefined;
 
 const modesOf = (s) => Object.fromEntries((s ?? '').split(',').map((p) => p.split(':')));
 const sameModes = (x, y) =>
@@ -587,6 +752,30 @@ export function checkPlan(plan, stackModes) {
   return Object.keys(fixed).length ? fixed : 'the plan has no actions';
 }
 
+/** "No account yet?" for the wizard: services with a free or cheap tier (components.json `offers`). */
+export const offersText = (offers) =>
+  [
+    'No account yet? These start free or cheap:',
+    ...offers.map((o) => `  ${o.name}: ${o.free} (${o.url}, checked ${o.checked})`),
+  ].join('\n');
+
+/**
+ * Values entered in the Stack page's connect cards: secrets join the run's secrets (never the
+ * answers file), plain values replace saved answers. INFRA_<KEY> and --secrets-stdin still win.
+ */
+export function takeEntered(a, secrets, entered) {
+  for (const [id, values] of Object.entries(entered ?? {})) {
+    const c = byId[id];
+    if (!c || a.components[id]?.mode !== 'connect') continue;
+    for (const f of fields(c, a.components[id])) {
+      const v = values[f.key];
+      if (v === undefined) continue;
+      if (f.secret) secrets[f.key] ??= v;
+      else a.components[id][f.key] = v;
+    }
+  }
+}
+
 /** Reads a plan from the server's database through the API container (SSH is the authorization). */
 function stackPlan(env, id, verb) {
   const r = ssh(
@@ -602,7 +791,7 @@ async function main() {
   process.chdir(ROOT);
   const argv = process.argv.slice(2).filter((x) => x !== '--');
   const VALUED = ['--answers', '--rotate', '--org'];
-  const opt = (n) => argv[argv.indexOf(n) + 1];
+  const opt = (n) => option(argv, n);
   const rotate = argv.flatMap((x, i) => (x === '--rotate' ? [argv[i + 1]] : []));
   const { cmd, only, planId, words } = command(
     argv.filter((x, i) => !x.startsWith('--') && !VALUED.includes(argv[i - 1])),
@@ -632,6 +821,8 @@ async function main() {
     images: { repo: UPSTREAM, version: 'latest' },
     components: {},
   };
+  // An answers file may leave the images out: the newest upstream release (docs/setup.md).
+  a.images = { repo: UPSTREAM, version: 'latest', ...a.images };
   const envFile = process.env.DEPLOY_ENV_FILE ?? `deploy/env/${a.env}.enc.env`;
   preflight(interactive);
   if (!existsSync(envFile)) {
@@ -656,12 +847,14 @@ async function main() {
   }
   let fixed;
   if (planId) {
-    fixed = checkPlan(stackPlan(current, planId, 'get'), current.STACK_MODES);
+    const got = stackPlan(current, planId, 'get');
+    fixed = checkPlan(got, current.STACK_MODES);
     if (typeof fixed === 'string') die(`plan ${planId}: ${fixed}`);
     for (const [id, mode] of Object.entries(fixed)) {
       a.components[id] ??= {};
       a.components[id].mode = mode;
     }
+    takeEntered(a, secrets, got.connect);
   }
   const confirm = interactive ? await ask(a, current, secrets, only, fixed) : undefined;
   const errors = validateAnswers(a);
@@ -684,6 +877,7 @@ async function main() {
   if (interactive || planId) writeFileSync(file, `${JSON.stringify(a, null, 2)}\n`);
   if (toDotenv(current) !== toDotenv(out.env)) encrypt(envFile, out.env);
   bootstrap(a, out.env, interactive);
+  if (out.env.COMPOSE_PROFILES.split(',').includes('llm-cli')) llmCli(out.env);
   const backups = (out.env.COMPOSE_FILE ?? '').includes('compose.backup.yaml');
   if (!backups) console.warn('  warning: no backups configured (docs/backups.md): --skip-backup');
   const deploy = spawnSync(

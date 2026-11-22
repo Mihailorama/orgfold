@@ -1,0 +1,5 @@
+# Profile openhands (app builder, docs/app-builders.md): OPENHANDS_PUBLIC_URL=https://openhands.example.com.
+# Operators only: the gate (profile gate) signs them in with the app.
+{$OPENHANDS_PUBLIC_URL} {
+	import gated openhands:8000
+}

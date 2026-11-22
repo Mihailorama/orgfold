@@ -37,13 +37,20 @@ type them there.
 Setup asks only for the base; every other component is added afterwards, one at a time, with
 `pnpm run infra -- add <component>` (the same action the stack console will call, SAASSTARTER-98):
 
-1. The product: its name (the app's `APP_NAME`) and a sentence or two about it.
-2. The server's address (IP, host name or an alias from `~/.ssh/config`), and the admin user.
-3. The app's address (`app.example.com` or the bare domain: the domain's owner decides), and the
+1. The product: its name (the app's `APP_NAME`) and a sentence or two about it, and your e-mail:
+   the operator console's admin (`OPERATOR_EMAILS`, docs/admin.md).
+2. Nothing about AI models: the operator console opens on "Connect a model" (docs/admin.md),
+   where you sign in to a ChatGPT or Claude subscription or enter an API key. For that, every
+   setup runs llm-cli (2 GiB), whose image holds the vendors' CLIs: the run builds it on the server
+   from `services/llm-cli` (never published, docs/llm-providers.md). `pnpm run infra -- add llm`
+   sets a model from the terminal instead (a subscription login there: `claude setup-token`, or
+   Codex's device-code sign-in into a throwaway `CODEX_HOME`).
+3. The server's address (IP, host name or an alias from `~/.ssh/config`), and the admin user.
+4. The app's address (`app.example.com` or the bare domain: the domain's owner decides), and the
    e-mail for Let's Encrypt (`internal`: Caddy's own CA, for intranets).
-4. The base components: Postgres and S3 (install on the server or connect yours) and mail
+5. The base components: Postgres and S3 (install on the server or connect yours) and mail
    (required: sign-in codes go by e-mail). Secrets are typed hidden and never shown again.
-5. Nothing about releases: it deploys the newest `v*` release of the images, looked up at each
+6. Nothing about releases: it deploys the newest `v*` release of the images, looked up at each
    run (the plan names it). Until your fork publishes its own, the upstream
    `ghcr.io/mihailorama/saas-agent-starter/{api,worker,web}` are used; `images.repo` in the answers
    file switches to yours, `images.version` pins a tag instead of `latest`.
@@ -52,20 +59,24 @@ The run ends with a receipt: what is installed and where, what is connected, and
 added yet with the command that adds it. Each component below can be added later: **install** it
 on the server, **connect** one you already have, or **skip** it.
 
-| Component | Install (on the server)                 | Connect                                      | Skip            |
-| --------- | --------------------------------------- | -------------------------------------------- | --------------- |
-| Postgres  | Postgres 17 (`db` profile)              | owner URL, app URL, Temporal's role          | -               |
-| S3        | SeaweedFS (`s3` profile), `s3.<domain>` | endpoint, bucket, keys (AWS, R2, ...)        | -               |
-| SMTP      | -                                       | `SMTP_URL`, sender (required, base)          | -               |
-| Analytics | Umami (`analytics`), `umami.<domain>`   | PostHog key and host                         | off             |
-| LLM       | -                                       | provider, model, key (config/ai-models.json) | AI features off |
-| Vault     | Vaultwarden (`vault`), `vault.<domain>` | Bitwarden Cloud or your Vaultwarden          | -               |
-| CRM       | Twenty (`crm`), `crm.<domain>`          | your Twenty: address and API key             | no CRM          |
+| Component | Install (on the server)                      | Connect                                      | Skip            |
+| --------- | -------------------------------------------- | -------------------------------------------- | --------------- |
+| Postgres  | Postgres 17 (`db` profile)                   | owner URL, app URL, Temporal's role          | -               |
+| S3        | SeaweedFS (`s3` profile), `s3.<domain>`      | endpoint, bucket, keys (AWS, R2, ...)        | -               |
+| SMTP      | -                                            | `SMTP_URL`, sender (required, base)          | -               |
+| Analytics | Umami (`analytics`), `umami.<domain>`        | PostHog key and host                         | off             |
+| LLM       | llm-cli for a subscription (Claude, ChatGPT) | provider, model, key (config/ai-models.json) | AI features off |
+| Vault     | Vaultwarden (`vault`), `vault.<domain>`      | Bitwarden Cloud or your Vaultwarden          | -               |
+| CRM       | Twenty (`crm`), `crm.<domain>`               | your Twenty: address and API key             | no CRM          |
 
 Everything else (backups to off-site S3, Temporal UI, PII redaction, llm-cli, booking, Chatwoot,
 Stripe, Langfuse, error tracking) is listed in [config/components.json](../config/components.json)
 and comes later through `pnpm run infra -- add <component>` (docs/TODO.md). The plan shows the RAM
-the choices reserve (`mem_limit` sums from [STACK.md](STACK.md)) against the server's RAM.
+the choices reserve (`mem_limit` sums from [STACK.md](STACK.md)) against the server's RAM. The limits
+are ceilings: idle use is about a third of them, so a sum above the server's RAM is a recommendation
+to grow, not a stop. Start on the server you have; when load or new components need more, resize it
+at your provider (the data stays on its disk) or run a heavy component (CRM, support) on a second
+server and connect it.
 
 ## What happens
 
@@ -139,7 +150,8 @@ printf 'SMTP_URL=...\n' | pnpm run infra -- --answers a.json --yes --secrets-std
 `KEY=value` lines on stdin, otherwise from the existing env file; a missing one stops the run
 before anything changes. It needs a key login as the admin already (no `ssh-copy-id`), sets
 `SOPS_AGE_RECIPIENTS` or a real key in `.sops.yaml`, and skips the vault step. `DEPLOY_ENV_FILE`
-and `DEPLOY_SSH_CONFIG` point at another env file or ssh config.
+and `DEPLOY_SSH_CONFIG` point at another env file or ssh config. Subscription logins: `INFRA_LLM_CLI_CLAUDE_TOKEN`
+(the `claude setup-token` token) or `INFRA_LLM_CLI_CODEX_AUTH` (Codex's `auth.json`, base64).
 
 ## When a run fails half-way
 

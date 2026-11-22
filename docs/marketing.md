@@ -12,6 +12,7 @@ run it and what to check before each release. Decision record:
 | Social posting     | Postiz, `docker compose --profile marketing`                | optional container                  |
 | Rank tracking      | SerpBear, same profile                                      | optional container                  |
 | Search Console     | `pnpm seo:report`                                           | local / scheduled, read-only        |
+| Daily report       | `pnpm site:report`, `.github/workflows/site-report.yml`     | daily in a Telegram chat            |
 | Bing / IndexNow    | `pnpm seo:indexnow --since <last deployed sha>`             | after each site deploy              |
 | AI answers (GEO)   | `pnpm geo:check`, questions in `config/geo.json`            | local, optional, no CI              |
 
@@ -184,6 +185,35 @@ docker compose --profile marketing up -d serpbear   # UI http://localhost:3200 (
 - Maintenance: one maintainer, releases in bursts (3.1.0 in March 2026, 3.1.1-3.1.2 in late
   October 2026). If it stalls, the Search Console average position from `seo:report` is the free
   first-party fallback for your own site; competitor positions then need a paid SEO tool.
+
+## Daily report (`pnpm site:report`)
+
+Every morning (06:00 UTC) `.github/workflows/site-report.yml` posts the site's numbers to a
+Telegram chat: yesterday (UTC) in Umami (visitors and views against the day before, bounce rate,
+top pages, sources, events such as `site_cta_clicked`) and the last 7 days with data in Search
+Console (clicks, impressions, CTR, average position, top queries). A part whose variables are
+missing is left out; without the Telegram pair a local run prints the report and a CI run sends
+nothing (a public repository's logs are public). Run it
+by hand from Actions (Run workflow) or locally with the same env.
+
+| Part           | Repository variables and secrets (Settings, Secrets and variables, Actions)                                                                                                            |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Umami          | variables `SITE_REPORT_UMAMI_URL` (the Umami address), `SITE_REPORT_UMAMI_USER`, `PAGES_UMAMI_WEBSITE_ID`; secret `SITE_REPORT_UMAMI_PASSWORD`                                         |
+| Search Console | variable `GSC_SITE_URL`, secret `GSC_CREDENTIALS` (the key JSON; setup in the next section)                                                                                            |
+| Telegram       | secret `SITE_REPORT_TELEGRAM_BOT_TOKEN` (a bot from @BotFather, or your support bot), secret `SITE_REPORT_TELEGRAM_CHAT_ID` (`@channelname`, or the numeric id of a chat with the bot) |
+
+For a report factory that sends one message per project (a team running several products):
+`pnpm site:report -- --numbers` prints the day's numbers as JSON instead of sending anything:
+sitemap pages that answer, visitors (yesterday, 7 days, the 7 before), Google search, and the
+GitHub stars of `GITHUB_REPO` (`owner/name`, token in `GITHUB_TOKEN`) as the last funnel step.
+
+The report logs in to Umami as a user with the `view-only` role who is a `team-view-only` member
+of the team that owns the site, so its password can read the numbers and change nothing. The site
+itself counts into Umami through the variables `PAGES_UMAMI_SCRIPT_URL` (`https://<umami>/script.js`)
+and `PAGES_UMAMI_WEBSITE_ID`, read only by the Pages build (`pages.yml`): the released web image
+reads `VITE_UMAMI_*`, so the site's tracker never ends up in it. Send the report with the
+product's own bot to the owner's private chat with it (docs/support.md "One bot per product"):
+analytics never go to a visitor's chat. The owner opens the bot once (`/start`) before the first run.
 
 ## Search Console (`pnpm seo:report`)
 

@@ -26,7 +26,8 @@ alone.
 ## Bootstrap
 
 1. The person signs up like any user and confirms the email address.
-2. Add the address to `OPERATOR_EMAILS` in the deployment's env file (`deploy/env/<env>.enc.env`,
+2. `pnpm run infra` asks for it at setup (`operators` in the answers file). Otherwise add the
+   address to `OPERATOR_EMAILS` in the deployment's env file (`deploy/env/<env>.enc.env`,
    docs/deploy.md) and deploy, or set it in `.env` locally.
 3. They turn on TOTP under Settings -> Security and open `/admin` (also in the user menu).
 
@@ -63,8 +64,10 @@ the account's role to `user`.
   On-box tools are reached at their public address from the API container, so the server must
   reach its own public IP (true on ordinary VPS hosts); "Open" is offered for those tools. The company block shows `APP_NAME`, the app's address and `MAIL_FROM`. How each component
   runs comes from `STACK_MODES`, which `pnpm run infra` writes (no secrets); a server set up
-  before it was added shows a note to run setup (which also deploys the newest release). The page changes nothing: "Add" and
-  "Change" give the `pnpm run infra -- add <id>` command, which shows a plan and asks first
+  before it was added shows a note to run setup (which also deploys the newest release). The page changes nothing on the servers:
+  "Add" and "Change" offer each mode as a button ("Install on this server", "Connect the existing
+  one", "Remove from the stack"), which makes a ready plan of that one action without the agent
+  (like a marketplace's Install), and the `pnpm run infra -- add <id>` command as the other way
   (SAASSTARTER-98).
 - **Stack, Plan a change**: the operator writes what the company needs; the planning agent
   (purpose `stack.plan`, docs/ai/stack.plan.md, worker/stack.py) answers with a reply and a plan
@@ -74,10 +77,40 @@ the account's role to `user`.
   and TOTP) and the stack the plan was made for (`STACK_MODES` unchanged since), and writes
   `operator.stack_plan.approved`. Then `pnpm run infra -- apply <id>` on the admin's machine reads
   the plan over SSH (`apps/api/src/stack-plan.ts` in the API container: SSH is the authorization),
-  checks the same three things again (a re-run after a failed apply resumes the same plan), asks for any address or key a `connect` needs, shows the
-  infrastructure plan, applies it once and marks it applied. Plans are `stack_plans` rows (not
-  tenant data). Off until `AI_STACK_PLAN_PROVIDER`, `AI_STACK_PLAN_MODEL` and `STACK_AI_ORG_ID`
-  (the operator's own organization, for the AI audit rows) are set on the worker.
+  checks the same three things again (a re-run after a failed apply resumes the same plan), asks for any address or key a `connect` still needs, shows the
+  infrastructure plan, applies it once and marks it applied.
+  Each action is a card; a `connect` card takes its address and keys on the page (the catalog's
+  `connect` fields, except the model's own), the way Lovable and v0 ask for a secret in their
+  chats: `PUT /api/admin/stack/plans/:id/connect/:component` (audited
+  `operator.stack_plan.connect_entered`) stores plain values and encrypts secrets at once
+  (WEBHOOK_ENCRYPTION_KEYS, bound to plan, component and field), and the page shows only a
+  secret's last 4 characters; values changed after approval send the plan back to approval. They never reach the agent, and a request that looks like it carries
+  a key (known key shapes, a URL with a password) is refused before it does. Apply takes them
+  (secrets join the run's secrets, never the answers file; `INFRA_<KEY>` still wins) and clears
+  them when it marks the plan applied.
+  A connect card, and the Add dialog of a component that can be connected, list "No account yet?"
+  services with a free or cheap tier (`offers` in config/components.json: name, pricing page, the
+  tier in a few words, the day it was checked); `pnpm run infra` prints the same list when you
+  choose to connect. Terms drift: `pnpm check:components` warns about an offer checked over 6
+  months ago, and the check is redone against the vendor's pricing page. Plans are `stack_plans` rows (not
+  tenant data). It thinks with the model connected on the console's first step (below), or the one
+  `AI_STACK_PLAN_*` name; without one it answers "Agent off". Its AI calls are audited under
+  `STACK_AI_ORG_ID`, or an "Operator console" organization the worker makes on first use.
+- **Connect a model** (the console's first step, then "Model" on the Stack page): until a model is
+  connected, `/admin` opens on this step, as an agent's setup starts (`Skip for now` hides it for
+  the browser session). The operator picks a vendor (one card with its logo each: OpenAI,
+  Anthropic, Google), then how: a **ChatGPT subscription** ("Sign in with ChatGPT" shows a sign-in
+  link and a one-time code; llm-cli runs `codex login --device-auth` on the server and keeps the
+  login, refreshed tokens included), a **Claude subscription** (they run `claude setup-token` on
+  their computer and paste the token), or an **API key**. A finished sign-in connects at once.
+  There is no model picker: the vendor's first `stack.plan` model in the contour is connected
+  (`gpt-6.1-sol` for OpenAI, `claude-opus-5-5` for Anthropic); the API accepts another listed
+  model, for agents that pick per task later. A vendor appears only when LiteLLM knows its price
+  or the row is unmetered (OpenRouter is not listed for that reason). Logins never leave llm-cli; a key is encrypted at once (`platform_ai`, bound to
+  `platform/default`, WEBHOOK_ENCRYPTION_KEYS) and only the worker's gateway decrypts it. Each
+  change needs a sign-in of the last 10 minutes and writes `operator.ai.connected`,
+  `operator.ai.signed_in`, `operator.ai.sign_in_started` or `operator.ai.disconnected`.
+  `pnpm run infra -- add llm` still sets a model from the terminal (non-interactive setups).
 
 Support conversations: the Chatwoot integration (docs/support.md) stores no link per user or
 organization, so the console shows none. Search Chatwoot's contacts by the user's email or id

@@ -28,15 +28,19 @@ const config = JSON.parse(
 };
 const BYO_KINDS = new Set(['api', 'aggregator', 'custom']);
 const kindOf = new Map(Object.entries(config.providers).map(([id, p]) => [id, p.kind]));
-/** BYO-able providers the current contour lists, and its purposes (the judge is the operator's). */
+// The operator's purposes (eval judge, the console's planning agent): never an organization's key.
+const OPERATOR_PURPOSES = new Set(['judge', 'stack.plan']);
+/** BYO-able providers the current contour lists for organizations' purposes, and those purposes. */
 const contour = () => {
-  const models = config.contours[env.AI_CONTOUR] ?? [];
+  const models = (config.contours[env.AI_CONTOUR] ?? [])
+    .map((m) => ({ ...m, purposes: m.purposes.filter((p) => !OPERATOR_PURPOSES.has(p)) }))
+    .filter((m) => m.purposes.length);
   const listed = new Set(models.map((m) => m.provider));
   return {
     providers: Object.entries(config.providers)
       .filter(([id, p]) => BYO_KINDS.has(p.kind) && listed.has(id))
       .map(([id, p]) => ({ id, kind: p.kind })),
-    purposes: [...new Set(models.flatMap((m) => m.purposes))].filter((p) => p !== 'judge'),
+    purposes: [...new Set(models.flatMap((m) => m.purposes))],
   };
 };
 

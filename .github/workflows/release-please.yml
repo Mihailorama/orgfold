@@ -63,7 +63,11 @@ jobs:
       # The landing page (pages.yml) goes out with each release. It is dispatched on main (the
       # release commit at this point), because the github-pages environment only accepts
       # deployments from the default branch unless a tag rule is added in its settings.
+      # Skipped when pages.yml is disabled (the site is deployed elsewhere, e.g. its own repo).
       - name: Publish the landing page
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run pages.yml --ref main
+        run: |
+          state=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/pages.yml" -q .state)
+          if [ "$state" != active ]; then echo "pages.yml is $state: no landing to publish"; exit 0; fi
+          gh workflow run pages.yml --ref main

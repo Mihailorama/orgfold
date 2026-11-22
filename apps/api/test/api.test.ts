@@ -95,7 +95,11 @@ describe('platform', () => {
     const spec = (await app.inject('/openapi.json')).json();
     expect(Object.keys(spec.paths)).toContain('/api/projects/');
     // SSO is off unless OIDC_* is set (tests run without it).
-    expect((await app.inject('/api/auth-config')).json()).toEqual({ sso: false });
+    // The product name comes at run time: one release image serves every product.
+    expect((await app.inject('/api/auth-config')).json()).toEqual({
+      sso: false,
+      appName: 'Workspace',
+    });
   });
 
   it('rejects anonymous and cross-origin requests', async () => {

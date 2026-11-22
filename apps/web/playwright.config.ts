@@ -29,6 +29,15 @@ export default defineConfig({
   // Layout guards and screenshots run with their own config (playwright.visual.config.ts).
   testIgnore: ['layout.spec.ts', 'visual.spec.ts'],
   retries: process.env.CI ? 1 : 0,
+  // TEST_RESULTS_DIR set (CI): also JUnit XML for the test report servers (docs/test-reports.md).
+  reporter: process.env.TEST_RESULTS_DIR
+    ? [
+        [process.env.CI ? 'dot' : 'list'],
+        ['junit', { outputFile: `${process.env.TEST_RESULTS_DIR}/e2e.xml` }],
+      ]
+    : process.env.CI
+      ? 'dot'
+      : 'list',
   workers: 1, // the smoke flows and the consent build share one API and Mailpit
   use: { baseURL: `http://localhost:${webPort}`, trace: 'retain-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],

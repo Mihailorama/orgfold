@@ -504,6 +504,13 @@ export const stackPlans = pgTable(
     reply: text('reply'),
     /** [{ component, mode }] with mode install | connect | skip, checked against the catalog. */
     actions: jsonb('actions').$type<{ component: string; mode: string }[]>(),
+    /** What the operator entered for each `connect` action, per field: a plain value, or a secret
+     * encrypted (`cipher`, bound to `stack-plan/<id>/<component>/<key>`) with its last 4 `hint`.
+     * Write-only from the page; `pnpm run infra -- apply` reads it over SSH and clears it. */
+    connect:
+      jsonb('connect').$type<
+        Record<string, Record<string, { value?: string; cipher?: string; hint?: string }>>
+      >(),
     stackVersion: text('stack_version').notNull(),
     aiCallId: uuid('ai_call_id').references(() => aiCalls.id, { onDelete: 'set null' }),
     /** Kept when the operator's account is deleted: the plan stays in the record. */
@@ -521,3 +528,22 @@ export const stackPlans = pgTable(
     ),
   ],
 );
+
+/**
+ * The model the platform's own agents think with (the stack console's agent, and AI features with
+ * no model of their own), connected by an operator in the console (docs/admin.md "Connect a
+ * model"). One row, id 'default'. `provider`/`model` are a pair of config/ai-models.json; an API
+ * key is stored encrypted like BYO keys (`v1:<key id>:<iv>:<data>`, WEBHOOK_ENCRYPTION_KEYS, bound
+ * to `platform/default`) and only the worker's gateway decrypts it. A subscription's login lives in
+ * llm-cli, never here. Not tenant data.
+ */
+export const platformAi = pgTable('platform_ai', {
+  id: text('id').primaryKey().default('default'),
+  provider: text('provider').notNull(),
+  model: text('model').notNull(),
+  apiKey: text('api_key'),
+  /** Last 4 characters of the key, to recognise it in the console. */
+  apiKeyHint: text('api_key_hint'),
+  connectedBy: text('connected_by').references(() => user.id, { onDelete: 'set null' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

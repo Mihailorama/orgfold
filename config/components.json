@@ -75,7 +75,21 @@
       "verify": {
         "install": "docker compose exec -T postgres pg_isready -q -U postgres -d app"
       },
-      "group": "base"
+      "group": "base",
+      "offers": [
+        {
+          "name": "Neon",
+          "url": "https://neon.com/pricing",
+          "free": "free: 1 GB per project, no card, pgvector; sleeps after 5 minutes idle",
+          "checked": "2026-11-17"
+        },
+        {
+          "name": "Supabase",
+          "url": "https://supabase.com/pricing",
+          "free": "free: 500 MB database; pauses after a week without activity",
+          "checked": "2026-11-17"
+        }
+      ]
     },
     {
       "id": "s3",
@@ -141,7 +155,21 @@
         }
       ],
       "verify": "docker compose exec -T worker python -m worker.selfcheck s3",
-      "group": "base"
+      "group": "base",
+      "offers": [
+        {
+          "name": "Cloudflare R2",
+          "url": "https://developers.cloudflare.com/r2/pricing/",
+          "free": "free: 10 GB stored a month, no egress fees",
+          "checked": "2026-11-17"
+        },
+        {
+          "name": "Backblaze B2",
+          "url": "https://www.backblaze.com/cloud-storage/pricing",
+          "free": "first 10 GB free, then about $7 per TB a month",
+          "checked": "2026-11-17"
+        }
+      ]
     },
     {
       "id": "smtp",
@@ -164,7 +192,27 @@
         }
       ],
       "verify": "docker compose exec -T worker python -m worker.selfcheck smtp",
-      "group": "base"
+      "group": "base",
+      "offers": [
+        {
+          "name": "Brevo",
+          "url": "https://www.brevo.com/pricing",
+          "free": "free: 300 emails a day, after account approval",
+          "checked": "2026-11-17"
+        },
+        {
+          "name": "Mailjet",
+          "url": "https://www.mailjet.com/pricing/",
+          "free": "free: 6,000 emails a month, 200 a day",
+          "checked": "2026-11-17"
+        },
+        {
+          "name": "SMTP2GO",
+          "url": "https://www.smtp2go.com/pricing/",
+          "free": "free: 1,000 emails a month",
+          "checked": "2026-11-17"
+        }
+      ]
     },
     {
       "id": "analytics",
@@ -206,7 +254,15 @@
       },
       "requires": {
         "install": ["postgres:install"]
-      }
+      },
+      "offers": [
+        {
+          "name": "PostHog Cloud",
+          "url": "https://posthog.com/pricing",
+          "free": "free: 1M events a month, no card; EU or US",
+          "checked": "2026-11-17"
+        }
+      ]
     },
     {
       "id": "llm",
@@ -281,7 +337,15 @@
       ],
       "verify": {
         "install": "docker compose exec -T vault curl -fsS -o /dev/null http://127.0.0.1:80/alive"
-      }
+      },
+      "offers": [
+        {
+          "name": "Bitwarden",
+          "url": "https://bitwarden.com/pricing/",
+          "free": "free organization for 2 people; Families $3.99 a month for up to 6, billed yearly",
+          "checked": "2026-11-17"
+        }
+      ]
     },
     {
       "id": "backups",
@@ -378,6 +442,122 @@
       }
     },
     {
+      "id": "gate",
+      "title": "Staff sign-in gate",
+      "tier": "optional",
+      "processor": false,
+      "description": "Sign-in gate (oauth2-proxy) in front of tools without a login of their own: only operators with two-factor get through (docs/sso.md)",
+      "modes": ["install", "skip"],
+      "install": {
+        "profile": "gate",
+        "ramMiB": 64,
+        "site": "GATE_PUBLIC_URL",
+        "env": {
+          "GATE_PUBLIC_URL": "https://auth.{domain}",
+          "GATE_COOKIE_SECRET": "{hex:16}",
+          "SSO_OAUTH2_PROXY_SECRET": "{hex:32}",
+          "SSO_OAUTH2_PROXY_REDIRECT_URIS": "{GATE_PUBLIC_URL}/oauth2/callback"
+        },
+        "rotate": ["GATE_COOKIE_SECRET", "SSO_OAUTH2_PROXY_SECRET"]
+      },
+      "verify": {
+        "install": "docker compose exec -T caddy wget -qO- http://gate:4180/ping"
+      }
+    },
+    {
+      "id": "openhands",
+      "title": "App builder (OpenHands)",
+      "tier": "optional",
+      "group": "product",
+      "processor": false,
+      "description": "OpenHands: agents build and change the company's internal apps on this server, with the model you connect in it (docs/app-builders.md)",
+      "modes": ["install", "skip"],
+      "requires": {
+        "install": ["gate:install"]
+      },
+      "install": {
+        "profile": "openhands",
+        "ramMiB": 2048,
+        "site": "OPENHANDS_PUBLIC_URL",
+        "env": {
+          "OPENHANDS_PUBLIC_URL": "https://openhands.{domain}"
+        }
+      },
+      "verify": {
+        "install": "docker compose exec -T openhands curl -fsS -o /dev/null http://127.0.0.1:8000/alive"
+      }
+    },
+    {
+      "id": "bolt",
+      "title": "App builder (bolt.diy)",
+      "tier": "optional",
+      "group": "product",
+      "processor": false,
+      "description": "bolt.diy: describe an app and see it run in your browser; for prototypes, production use in a company needs StackBlitz's commercial license (docs/app-builders.md)",
+      "modes": ["install", "skip"],
+      "requires": {
+        "install": ["gate:install"]
+      },
+      "install": {
+        "profile": "bolt",
+        "ramMiB": 1024,
+        "site": "BOLT_PUBLIC_URL",
+        "env": {
+          "BOLT_PUBLIC_URL": "https://bolt.{domain}"
+        }
+      },
+      "verify": {
+        "install": "docker compose exec -T bolt curl -fsS -o /dev/null http://127.0.0.1:5173/"
+      }
+    },
+    {
+      "id": "allure",
+      "title": "Test reports (Allure)",
+      "tier": "optional",
+      "processor": false,
+      "description": "Allure server: a report for every CI run with history and trends, for operators behind the sign-in gate; light. Alerts come from the CI run itself (docs/test-reports.md)",
+      "modes": ["install", "skip"],
+      "requires": {
+        "install": ["gate:install"]
+      },
+      "install": {
+        "profile": "allure",
+        "ramMiB": 768,
+        "site": "ALLURE_PUBLIC_URL",
+        "env": {
+          "ALLURE_PUBLIC_URL": "https://tests.{domain}",
+          "ALLURE_CI_PASSWORD": "{hex:16}",
+          "ALLURE_JWT_SECRET": "{hex:32}"
+        }
+      },
+      "verify": {
+        "install": "docker compose exec -T caddy wget -qO- http://allure:5050/allure-docker-service/version"
+      }
+    },
+    {
+      "id": "reportportal",
+      "title": "Test reports (ReportPortal)",
+      "tier": "optional",
+      "processor": false,
+      "description": "ReportPortal: test results server with dashboards, failure triage and email alerts, its own logins; about 3 GiB of memory in use, 6.3 GiB of limits (docs/test-reports.md)",
+      "modes": ["install", "skip"],
+      "install": {
+        "profile": "reportportal",
+        "ramMiB": 6464,
+        "site": "REPORTPORTAL_PUBLIC_URL",
+        "after": "deploy/setup/reportportal-setup.sh",
+        "env": {
+          "REPORTPORTAL_PUBLIC_URL": "https://reports.{domain}",
+          "REPORTPORTAL_DB_PASSWORD": "{hex:24}",
+          "REPORTPORTAL_RABBITMQ_PASSWORD": "{hex:24}",
+          "REPORTPORTAL_ADMIN_PASSWORD": "{hex:16}"
+        }
+      },
+      "verify": {
+        "install": "docker compose exec -T caddy wget -qO- http://rp-gateway:8080/api/health"
+      }
+    },
+    {
       "id": "crm",
       "title": "CRM (Twenty)",
       "tier": "optional",
@@ -421,7 +601,15 @@
       "keys": ["TWENTY_API_KEY", "CRM_FILE"],
       "verify": {
         "install": "docker compose exec -T twenty curl -fsS -o /dev/null http://localhost:3000/healthz"
-      }
+      },
+      "offers": [
+        {
+          "name": "Twenty Cloud",
+          "url": "https://www.twenty.com/pricing",
+          "free": "no free plan: from $9 per user a month, billed yearly; free trial",
+          "checked": "2026-11-17"
+        }
+      ]
     },
     {
       "id": "billing",

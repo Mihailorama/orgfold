@@ -156,7 +156,7 @@ CASES = [
     ),
     (
         "codex_cli",
-        "gpt-5.5",
+        "gpt-6.1-sol",
         "/codex/v1/chat/completions",
         ("authorization", "Bearer local-dev-llm-cli-token"),
         "reported-model",

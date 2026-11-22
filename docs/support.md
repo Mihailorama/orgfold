@@ -219,6 +219,8 @@ daily retention schedule deletes any left over after a day. Configuration (worke
   name). Without `state` a new item goes to the project's **Intake**; with it, straight into that
   state. The worker resolves the states at start and refuses to start when one is unknown or in
   the `completed` or `cancelled` group. Labels are created in Plane when missing.
+  If agents work your tracker, never set `state` to the state they pick work up from (for
+  example Todo): what the system files lands in Intake or Backlog, and a human launches it.
 - Nothing ever closes an item or moves it to a completed state: accepting, declining and closing
   are for humans.
 - Errors from tracker calls carry only the HTTP status or the error class: request URLs (Plane's
@@ -356,6 +358,27 @@ team reply in the topic ──> same webhook ──> copied to the user's privat
   Over it, messages are dropped with a 200 answer, so Telegram does not redeliver them.
 - A deleted topic is recreated on the user's next message, a closed one is reopened; a reply the
   user cannot receive (they blocked the bot) gets a "Not delivered" note in the topic.
+
+### One bot per product (launch practice)
+
+Give each product exactly one Telegram bot, named after the product, and never share it with
+another product. The same bot serves visitors (support, linked from the site) and its owner
+(internal messages such as the daily site report, docs/marketing.md "Daily report"); a product
+gets no second bot. The bot has one consumer of its updates: this webhook (a webhook or polling,
+never both).
+
+- Who gets what: internal messages go only to the owner's private chat with the bot, by its
+  numeric chat id kept in a secret (never in the repository); anyone else is a visitor. A visitor's
+  chat may carry the conversation and product announcements (new features, videos), never plans,
+  tasks, priorities, blockers, alerts, SEO or analytics.
+- Questions the team answers go to the product's private support group (the forum group above) and
+  the answer is relayed to the visitor; the bot works in no other group.
+- Infrastructure alerts stay on your ops alert channel (Prometheus alerts, infra/otel), not in the
+  product bot.
+- The public command menu (`/setcommands`) lists support commands only.
+- Tests never write into real chats: use a test bot and a test group, never the product's.
+- Before launch, open the bot from a second Telegram account as a visitor and read everything that
+  arrives: nothing internal may show up there.
 
 ### Set up
 

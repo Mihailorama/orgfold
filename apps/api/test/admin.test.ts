@@ -5,6 +5,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   auditLog,
+  platformAi,
   rewardGrants,
   session,
   stackPlans,
@@ -250,6 +251,130 @@ describe('stack (docs/admin.md "Stack")', () => {
     expect(rows.map((r) => [r.action, r.actorId, r.orgId])).toEqual([
       ['operator.stack_plan.approved', op.id, null],
     ]);
+  });
+
+  it('adds from the catalog without the agent; the connect card seals keys; no keys to the agent', async () => {
+    const { openSecret } = await import('../src/webhook-secret.ts');
+    // A key in a request would reach the model: refused before any plan is made.
+    const leak = await post(op, '/api/admin/stack/plans', {
+      request: 'Connect our Twenty, key sk-proj-abcdefghijklmnopqrstu',
+    });
+    expect(leak.statusCode).toBe(400);
+    expect(leak.json().error).toMatch(/connect card/);
+    const mail = { request: 'Mail through smtps://mailer:hunter22@smtp.example.com:465' };
+    expect((await post(op, '/api/admin/stack/plans', mail)).statusCode).toBe(400);
+    for (const bad of [
+      { component: 'core', mode: 'skip' },
+      { component: 'crm', mode: 'nope' },
+      { component: 'nope', mode: 'install' },
+    ]) {
+      expect((await post(op, '/api/admin/stack/plans', bad)).statusCode).toBe(400);
+    }
+    const made = await post(op, '/api/admin/stack/plans', { component: 'crm', mode: 'connect' });
+    expect(made.statusCode).toBe(201);
+    const plan = made.json() as { id: string };
+    expect(plan).toMatchObject({
+      status: 'ready',
+      request: 'Connect CRM (Twenty)',
+      actions: [
+        {
+          component: 'crm',
+          mode: 'connect',
+          fields: [
+            { key: 'TWENTY_API_URL', secret: false, entered: null },
+            { key: 'TWENTY_API_KEY', secret: true, entered: null },
+          ],
+          offers: [{ name: 'Twenty Cloud', checked: expect.stringMatching(/^\d{4}-/) }],
+        },
+      ],
+    });
+    const enter = (values: object, component = 'crm') =>
+      call(op, 'PUT', `/api/admin/stack/plans/${plan.id}/connect/${component}`, { values });
+    expect(
+      (await call(owner, 'PUT', `/api/admin/stack/plans/${plan.id}/connect/crm`, { values: {} }))
+        .statusCode,
+    ).toBe(403);
+    expect((await enter({ TWENTY_API_URL: 'http://plain.example.com' })).statusCode).toBe(400);
+    expect((await enter({ NOPE: 'x' })).statusCode).toBe(400);
+    expect((await enter({ POSTHOG_KEY: 'phc_x' }, 'analytics')).statusCode).toBe(400);
+    const ok = await enter({
+      TWENTY_API_URL: 'https://crm.example.com',
+      TWENTY_API_KEY: 'local-dev-twenty-key',
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(JSON.stringify(ok.json())).not.toContain('local-dev-twenty-key');
+    expect(ok.json().actions[0].fields.map((f: { entered: string }) => f.entered)).toEqual([
+      'https://crm.example.com',
+      '…-key',
+    ]);
+    const [row] = await db.select().from(stackPlans).where(eq(stackPlans.id, plan.id));
+    const cipher = row?.connect?.crm?.TWENTY_API_KEY?.cipher ?? '';
+    expect(cipher).toMatch(/^v1:/);
+    expect(openSecret(cipher, `stack-plan/${plan.id}/crm/TWENTY_API_KEY`)).toBe(
+      'local-dev-twenty-key',
+    );
+    expect(() => openSecret(cipher, `stack-plan/${plan.id}/crm/OTHER`)).toThrow();
+    // Changed after approval: approved again before it can run.
+    await db.update(stackPlans).set({ status: 'approved' }).where(eq(stackPlans.id, plan.id));
+    expect((await enter({ TWENTY_API_URL: 'https://other.example.com' })).json()).toMatchObject({
+      status: 'ready',
+    });
+    // crm is not added (crm:skip in STACK_MODES of .env.example): removing it plans nothing.
+    const same = await post(op, '/api/admin/stack/plans', { component: 'crm', mode: 'skip' });
+    expect(same.statusCode).toBe(409);
+  });
+
+  it("connects the agents' model: offered pairs only, key sealed, recent sign-in, audited", async () => {
+    await db.delete(platformAi);
+    expect((await get(owner, '/api/admin/ai')).statusCode).toBe(403);
+    const first = (await get(op, '/api/admin/ai')).json() as {
+      connected: unknown;
+      options: { provider: string; kind: string; models: string[] }[];
+      logins: unknown;
+    };
+    expect(first.connected).toBeNull();
+    expect(first.logins).toBeNull(); // no llm-cli in the test env: subscriptions not available
+    const anthropic = first.options.find((o) => o.provider === 'anthropic');
+    // one logo per vendor; the default model is the registry's first (Opus 5.5, GPT-6.1-sol)
+    expect(anthropic).toMatchObject({ kind: 'key', brand: 'anthropic' });
+    expect(anthropic?.models[0]).toBe('claude-opus-5-5');
+    expect(first.options.find((o) => o.provider === 'openai')).toMatchObject({ brand: 'openai' });
+    expect(first.options.find((o) => o.provider === 'codex_cli')).toMatchObject({
+      kind: 'subscription',
+      brand: 'openai',
+      models: ['gpt-6.1-sol', 'gpt-6-astra'],
+    });
+    const put = (json: object) => call(op, 'PUT', '/api/admin/ai', json);
+    const model = anthropic?.models[0] ?? '';
+    expect((await put({ provider: 'anthropic', model: 'not-offered' })).statusCode).toBe(400);
+    expect((await put({ provider: 'anthropic', model })).json()).toEqual({
+      error: 'enter the API key',
+    });
+    expect((await put({ provider: 'codex_cli', model: 'gpt-6.1-sol' })).statusCode).toBe(400);
+    const signedIn = (at: Date) =>
+      db.update(session).set({ createdAt: at }).where(eq(session.userId, op.id));
+    await signedIn(new Date(Date.now() - 20 * 60_000));
+    const key = 'local-dev-anthropic-key-0123';
+    expect((await put({ provider: 'anthropic', model, apiKey: key })).statusCode).toBe(401);
+    await signedIn(new Date());
+    expect((await put({ provider: 'anthropic', model, apiKey: key })).statusCode).toBe(200);
+    const [row] = await db.select().from(platformAi);
+    expect(row).toMatchObject({ provider: 'anthropic', model, apiKeyHint: '0123' });
+    expect(row?.apiKey).toMatch(/^v1:/);
+    expect(row?.apiKey).not.toContain(key);
+    const after = (await get(op, '/api/admin/ai')).json() as { connected: object };
+    expect(after.connected).toMatchObject({ provider: 'anthropic', model, keyHint: '0123' });
+    expect(JSON.stringify(after)).not.toContain(key);
+    // same vendor again, no model named (the console has no picker): the stored key stays
+    expect((await put({ provider: 'anthropic' })).statusCode).toBe(200);
+    expect((await db.select().from(platformAi))[0]?.apiKey).toBe(row?.apiKey);
+    const audit = await withOperatorRead(db, (tx) =>
+      tx.select().from(auditLog).where(eq(auditLog.action, 'operator.ai.connected')),
+    );
+    expect(audit.map((r) => [r.actorId, r.target])).toContainEqual([op.id, `anthropic/${model}`]);
+    expect(JSON.stringify(audit)).not.toContain(key);
+    expect((await call(op, 'DELETE', '/api/admin/ai')).statusCode).toBe(200);
+    expect(await db.select().from(platformAi)).toEqual([]);
   });
 
   it('reads only known modes from STACK_MODES', async () => {
