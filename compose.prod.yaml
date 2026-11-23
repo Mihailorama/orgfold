@@ -1120,6 +1120,8 @@ services:
     depends_on:
       openseo-init: { condition: service_completed_successfully }
       openseo-crawl-gateway: { condition: service_started }
+      # Nginx resolves `runtime` once at start: a new runtime container (an update) restarts it.
+      openseo-runtime: { condition: service_healthy, restart: true }
     networks: [seo]
 
 volumes:
