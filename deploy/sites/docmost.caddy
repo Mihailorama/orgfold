@@ -1,0 +1,6 @@
+# Profile docmost (team wiki, docs/wiki.md): its own domain, DOCMOST_PUBLIC_URL=https://docs.example.com.
+# Docmost has its own login; editing runs over a WebSocket, which reverse_proxy passes through.
+{$DOCMOST_PUBLIC_URL} {
+	tls {$CADDY_TLS}
+	reverse_proxy docmost:3000
+}

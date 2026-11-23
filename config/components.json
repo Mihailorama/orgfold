@@ -612,6 +612,40 @@
       ]
     },
     {
+      "id": "docmost",
+      "title": "Team wiki (Docmost)",
+      "tier": "optional",
+      "group": "product",
+      "processor": false,
+      "description": "Docmost: the team's wiki and docs, a Notion and Confluence alternative, with its own login (docs/wiki.md)",
+      "modes": ["install", "skip"],
+      "requires": {
+        "install": ["postgres:install"]
+      },
+      "install": {
+        "profile": "docmost",
+        "ramMiB": 768,
+        "site": "DOCMOST_PUBLIC_URL",
+        "env": {
+          "DOCMOST_PUBLIC_URL": "https://docs.{domain}",
+          "DOCMOST_DB_PASSWORD": "{hex:24}",
+          "DOCMOST_APP_SECRET": "{hex:32}"
+        },
+        "rotate": ["DOCMOST_DB_PASSWORD"]
+      },
+      "keys": [
+        "DOCMOST_S3_BUCKET",
+        "DOCMOST_SMTP_HOST",
+        "DOCMOST_SMTP_PORT",
+        "DOCMOST_SMTP_USERNAME",
+        "DOCMOST_SMTP_PASSWORD",
+        "DOCMOST_MAIL_FROM"
+      ],
+      "verify": {
+        "install": "docker compose exec -T docmost curl -fsS -o /dev/null http://127.0.0.1:3000/api/health"
+      }
+    },
+    {
       "id": "billing",
       "title": "Billing",
       "tier": "optional",

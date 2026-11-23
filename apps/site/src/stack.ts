@@ -239,6 +239,13 @@ export const stack: { group: string; tools: Tool[] }[] = [
         connect: 'Chatwoot Cloud',
       },
       {
+        name: 'Docmost',
+        role: 'team wiki and docs',
+        license: 'AGPL-3.0 + `ee/` commercial',
+        images: ['docmost/docmost'],
+        href: 'https://github.com/docmost/docmost',
+      },
+      {
         name: 'Twenty',
         role: 'CRM',
         license: 'AGPL-3.0 + app exception',

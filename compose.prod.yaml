@@ -8,7 +8,8 @@
 # booking (Cal.diy, image built by CI from a pinned upstream commit, IMAGE_CALDIY),
 # vault (Vaultwarden, the secrets vault, docs/secrets.md), analytics (Umami, docs/product-analytics.md),
 # gate (oauth2-proxy: the staff sign-in gate, docs/sso.md), openhands and bolt (app builders behind
-# the gate, docs/app-builders.md), allure and reportportal (test reports, docs/test-reports.md).
+# the gate, docs/app-builders.md), allure and reportportal (test reports, docs/test-reports.md),
+# docmost (team wiki, docs/wiki.md).
 # `pnpm run infra` (docs/setup.md) writes the env file and picks the profiles for you.
 # Licenses of every image: docs/LICENSES.md.
 
@@ -57,6 +58,7 @@ services:
       BOLT_PUBLIC_URL: ${BOLT_PUBLIC_URL:-}
       ALLURE_PUBLIC_URL: ${ALLURE_PUBLIC_URL:-}
       REPORTPORTAL_PUBLIC_URL: ${REPORTPORTAL_PUBLIC_URL:-}
+      DOCMOST_PUBLIC_URL: ${DOCMOST_PUBLIC_URL:-}
       # vault site: who may reach Vaultwarden's /admin; everyone else gets 403
       VAULT_ADMIN_IPS: ${VAULT_ADMIN_IPS:-127.0.0.1/32}
     ports:
@@ -140,6 +142,7 @@ services:
       - LLM_CLI_TOKEN
       - MAIL_FROM
       - CRM_PUBLIC_URL
+      - DOCMOST_PUBLIC_URL
       - UMAMI_PUBLIC_URL
       - VAULT_PUBLIC_URL
       - WEBHOOK_ENCRYPTION_KEYS
@@ -636,6 +639,75 @@ services:
       DISABLE_CRON_JOBS_REGISTRATION: "true"
     volumes: [twenty_data:/app/packages/twenty-server/.local-storage]
     depends_on: { twenty: { condition: service_healthy } }
+
+  # --- profile docmost: Docmost (AGPL-3.0 core, unmodified; docs/wiki.md), the team wiki at
+  # DOCMOST_PUBLIC_URL. Role + database `docmost` on the app's Postgres (docmost-db; the backups
+  # cover it), Redis db 5, files in the stack's S3, bucket DOCMOST_S3_BUCKET (created at start when
+  # missing; the backup overlay copies it). Its own login: SSO is a paid edition (docs/sso.md).
+  docmost-db:
+    profiles: [docmost]
+    image: postgres:17-alpine
+    logging: *logging
+    mem_limit: 64m
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGDATABASE: app
+      PGPASSWORD: ${POSTGRES_PASSWORD:-}
+      DB_PASSWORD: ${DOCMOST_DB_PASSWORD:-}
+      DB_NAME: docmost
+    entrypoint: ["/bin/sh", "/db-init.sh"]
+    volumes: ["./db-init.sh:/db-init.sh:ro"]
+    depends_on:
+      postgres: { condition: service_healthy, required: false }
+
+  docmost:
+    profiles: [docmost]
+    image: docmost/docmost:0.97.0@sha256:40c454d74ffdd9ecb15833e4d96f3a630d59aad862a1869381ae6ee086454419
+    logging: *logging
+    mem_limit: 768m
+    restart: unless-stopped
+    # Docmost does not create its bucket: do it first (any S3, the SDK is in the image).
+    working_dir: /app/apps/server
+    command:
+      - sh
+      - -c
+      - >-
+        node -e 'const s3=require("@aws-sdk/client-s3"), e=process.env, b={Bucket:e.AWS_S3_BUCKET};
+        const c=new s3.S3Client({region:e.AWS_S3_REGION,endpoint:e.AWS_S3_ENDPOINT||undefined,forcePathStyle:true,
+        credentials:{accessKeyId:e.AWS_S3_ACCESS_KEY_ID,secretAccessKey:e.AWS_S3_SECRET_ACCESS_KEY}});
+        c.send(new s3.HeadBucketCommand(b)).catch(()=>c.send(new s3.CreateBucketCommand(b)))
+        .catch((x)=>console.error("docmost: bucket "+b.Bucket+": "+x.name))' && cd /app && exec pnpm start
+    environment:
+      APP_URL: ${DOCMOST_PUBLIC_URL:-}
+      APP_SECRET: ${DOCMOST_APP_SECRET:-}
+      DATABASE_URL: postgresql://docmost:${DOCMOST_DB_PASSWORD:-}@postgres:5432/docmost
+      REDIS_URL: redis://redis:6379/5
+      STORAGE_DRIVER: s3
+      AWS_S3_ENDPOINT: ${S3_ENDPOINT:-}
+      AWS_S3_REGION: ${S3_REGION:-us-east-1}
+      AWS_S3_BUCKET: ${DOCMOST_S3_BUCKET:-docmost}
+      AWS_S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      AWS_S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      AWS_S3_FORCE_PATH_STYLE: "true"
+      DISABLE_TELEMETRY: "true"
+      # Invitations and password resets; no host = no mail (copy the invite link by hand).
+      MAIL_DRIVER: smtp
+      SMTP_HOST: ${DOCMOST_SMTP_HOST:-}
+      SMTP_PORT: ${DOCMOST_SMTP_PORT:-587}
+      SMTP_USERNAME: ${DOCMOST_SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${DOCMOST_SMTP_PASSWORD:-}
+      MAIL_FROM_ADDRESS: ${DOCMOST_MAIL_FROM:-}
+      MAIL_FROM_NAME: Docmost
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      start_period: 120s
+      retries: 12
+    depends_on:
+      docmost-db: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      s3: { condition: service_healthy, required: false }
 
   # --- profile vault: Vaultwarden (AGPL-3.0, unmodified) as the team's secrets vault for humans
   # and coding agents (docs/secrets.md). Its database lives on the app's Postgres server (create
