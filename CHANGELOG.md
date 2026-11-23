@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.0](https://github.com/Mihailorama/orgfold/compare/v0.3.0...v0.4.0) (2026-11-23)
+
+
+### Features
+
+* Hermes Agent, a personal agent with memory for your team, behind the staff sign-in gate ([#138](https://github.com/Mihailorama/orgfold/issues/138)) ([83bf469](https://github.com/Mihailorama/orgfold/commit/83bf4698d279d241f96e9108c26bb9970e673c38))
+* SEO research on your server: OpenSEO, an open-source Semrush analog, in the infrastructure catalog ([#137](https://github.com/Mihailorama/orgfold/issues/137)) ([88bad05](https://github.com/Mihailorama/orgfold/commit/88bad05d6ff092739a3c26ddd5abb4c320c523d6))
+* team wiki in the catalog: install Docmost, a free Notion alternative, or connect your AppFlowy ([#136](https://github.com/Mihailorama/orgfold/issues/136)) ([3228bbf](https://github.com/Mihailorama/orgfold/commit/3228bbf1d9701a8328ad4e7616791e1c2a1723be))
+
+
+### Fixes
+
+* **api:** the Stack page's component group typechecks with tsc 7 ([#131](https://github.com/Mihailorama/orgfold/issues/131)) ([0a52339](https://github.com/Mihailorama/orgfold/commit/0a52339db742380b2728174a85e2d4d7148e7bbf))
+* **ci:** a release skips publishing the landing page when pages.yml is disabled ([#130](https://github.com/Mihailorama/orgfold/issues/130)) ([9491830](https://github.com/Mihailorama/orgfold/commit/9491830a1de2754055a9af819784c7d5e1c57b89))
+* **infra:** setup installs the newest release again: images default to ghcr.io/mihailorama/orgfold ([#134](https://github.com/Mihailorama/orgfold/issues/134)) ([d68a49f](https://github.com/Mihailorama/orgfold/commit/d68a49f946371f19876b2d7ce70fdc6529577c95))
+* **site:** the cookie policy no longer lists cookieless Umami as needing consent ([#133](https://github.com/Mihailorama/orgfold/issues/133)) ([4613f1e](https://github.com/Mihailorama/orgfold/commit/4613f1e418dfec818f7ac6c5698dbef2b190c7dd))
+
 ## [0.3.0](https://github.com/Mihailorama/saas-agent-starter/compare/v0.2.0...v0.3.0) (2026-11-21)
 
 
