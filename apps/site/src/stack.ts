@@ -244,6 +244,7 @@ export const stack: { group: string; tools: Tool[] }[] = [
         license: 'AGPL-3.0 + `ee/` commercial',
         images: ['docmost/docmost'],
         href: 'https://github.com/docmost/docmost',
+        connect: 'AppFlowy (paid licence for a team)',
       },
       {
         name: 'Twenty',

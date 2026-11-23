@@ -58,7 +58,7 @@ services:
       BOLT_PUBLIC_URL: ${BOLT_PUBLIC_URL:-}
       ALLURE_PUBLIC_URL: ${ALLURE_PUBLIC_URL:-}
       REPORTPORTAL_PUBLIC_URL: ${REPORTPORTAL_PUBLIC_URL:-}
-      DOCMOST_PUBLIC_URL: ${DOCMOST_PUBLIC_URL:-}
+      WIKI_PUBLIC_URL: ${WIKI_PUBLIC_URL:-}
       # vault site: who may reach Vaultwarden's /admin; everyone else gets 403
       VAULT_ADMIN_IPS: ${VAULT_ADMIN_IPS:-127.0.0.1/32}
     ports:
@@ -142,7 +142,7 @@ services:
       - LLM_CLI_TOKEN
       - MAIL_FROM
       - CRM_PUBLIC_URL
-      - DOCMOST_PUBLIC_URL
+      - WIKI_PUBLIC_URL
       - UMAMI_PUBLIC_URL
       - VAULT_PUBLIC_URL
       - WEBHOOK_ENCRYPTION_KEYS
@@ -641,7 +641,7 @@ services:
     depends_on: { twenty: { condition: service_healthy } }
 
   # --- profile docmost: Docmost (AGPL-3.0 core, unmodified; docs/wiki.md), the team wiki at
-  # DOCMOST_PUBLIC_URL. Role + database `docmost` on the app's Postgres (docmost-db; the backups
+  # WIKI_PUBLIC_URL. Role + database `docmost` on the app's Postgres (docmost-db; the backups
   # cover it), Redis db 5, files in the stack's S3, bucket DOCMOST_S3_BUCKET (created at start when
   # missing; the backup overlay copies it). Its own login: SSO is a paid edition (docs/sso.md).
   docmost-db:
@@ -679,7 +679,7 @@ services:
         c.send(new s3.HeadBucketCommand(b)).catch(()=>c.send(new s3.CreateBucketCommand(b)))
         .catch((x)=>console.error("docmost: bucket "+b.Bucket+": "+x.name))' && cd /app && exec pnpm start
     environment:
-      APP_URL: ${DOCMOST_PUBLIC_URL:-}
+      APP_URL: ${WIKI_PUBLIC_URL:-}
       APP_SECRET: ${DOCMOST_APP_SECRET:-}
       DATABASE_URL: postgresql://docmost:${DOCMOST_DB_PASSWORD:-}@postgres:5432/docmost
       REDIS_URL: redis://redis:6379/5

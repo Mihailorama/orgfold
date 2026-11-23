@@ -612,27 +612,41 @@
       ]
     },
     {
-      "id": "docmost",
-      "title": "Team wiki (Docmost)",
+      "id": "wiki",
+      "title": "Team wiki",
       "tier": "optional",
       "group": "product",
       "processor": false,
-      "description": "Docmost: the team's wiki and docs, a Notion and Confluence alternative, with its own login (docs/wiki.md)",
-      "modes": ["install", "skip"],
+      "description": "Team wiki and docs, a Notion alternative: install Docmost (free), or connect the AppFlowy you run (a team needs a paid AppFlowy licence) (docs/wiki.md)",
+      "ask": "Do you need a team wiki?",
+      "labels": {
+        "install": "yes: install Docmost on the server",
+        "connect": "I already run AppFlowy: link it",
+        "skip": "no wiki"
+      },
+      "modes": ["install", "connect", "skip"],
       "requires": {
         "install": ["postgres:install"]
       },
       "install": {
         "profile": "docmost",
         "ramMiB": 768,
-        "site": "DOCMOST_PUBLIC_URL",
+        "site": "WIKI_PUBLIC_URL",
         "env": {
-          "DOCMOST_PUBLIC_URL": "https://docs.{domain}",
+          "WIKI_PUBLIC_URL": "https://docs.{domain}",
           "DOCMOST_DB_PASSWORD": "{hex:24}",
           "DOCMOST_APP_SECRET": "{hex:32}"
         },
         "rotate": ["DOCMOST_DB_PASSWORD"]
       },
+      "connect": [
+        {
+          "key": "WIKI_PUBLIC_URL",
+          "prompt": "Your AppFlowy address (AppFlowy Cloud or your licensed self-host)",
+          "secret": false,
+          "validate": "^https://"
+        }
+      ],
       "keys": [
         "DOCMOST_S3_BUCKET",
         "DOCMOST_SMTP_HOST",

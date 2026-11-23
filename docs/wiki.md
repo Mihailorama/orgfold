@@ -1,14 +1,27 @@
-# Team wiki (Docmost)
+# Team wiki (Docmost or AppFlowy)
 
-The team's own wiki and docs, the free alternative to Notion or Confluence, on the company's server:
-[Docmost](https://github.com/docmost/docmost) Community edition (AGPL-3.0 core, run unmodified).
-Spaces, pages with a rich editor, real-time co-editing, comments, page history, Markdown and Notion
-import, full-text search. Install it from the console's Stack page (Add) or with
-`pnpm run infra -- add docmost`. Tracker: ORGFOLD-121.
+The team's own wiki and docs, an alternative to Notion or Confluence. Component `wiki` in
+config/components.json, one of (Stack page, or `pnpm run infra -- add wiki`):
+
+- **install**: [Docmost](https://github.com/docmost/docmost) Community edition (AGPL-3.0 core, run
+  unmodified, free) on the company's server. Spaces, pages with a rich editor, real-time
+  co-editing, comments, page history, Markdown and Notion import, full-text search. The rest of
+  this page is about it.
+- **connect**: the [AppFlowy](https://github.com/AppFlowy-IO/AppFlowy) you already run, AppFlowy
+  Cloud or your licensed self-host. You give its address (`WIKI_PUBLIC_URL`); the console's Stack
+  page links to it and checks that it answers. Nothing else is wired: no sign-in with the app, no
+  data exchange. We never install AppFlowy: its server is now
+  [AppFlowy-SelfHost-Commercial](https://github.com/AppFlowy-IO/AppFlowy-SelfHost-Commercial)
+  under its own commercial license (the open-source AppFlowy-Cloud server is archived), and its
+  free self-hosted tier has one user seat, so a team needs a paid AppFlowy licence or plan
+  (checked 2026-11-23). Its data lives with that AppFlowy, outside our backups.
+- **skip**: no wiki.
+
+Tracker: ORGFOLD-121.
 
 ## Where it runs and where its data lives
 
-- Site: `DOCMOST_PUBLIC_URL` (default `https://docs.<your domain>`), through Caddy
+- Site: `WIKI_PUBLIC_URL` (default `https://docs.<your domain>`), through Caddy
   (`deploy/sites/docmost.caddy`).
 - Pages, users, spaces: role and database `docmost` on the stack's Postgres (the `docmost-db`
   one-shot creates them), so the backups cover them (docs/backups.md).

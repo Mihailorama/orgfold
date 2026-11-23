@@ -260,6 +260,10 @@ Notes:
     distributed with the app. Its `docmost-db` one-shot reuses the `postgres` image. It is in
     compose.prod.yaml only, so a delivery that bans AGPL leaves the component off (replacement
     map below).
+  - AppFlowy (the `wiki` component's connect mode): nothing of it runs in the stack, we only link
+    to the client's own instance. The app is AGPL-3.0; its self-hosted server is
+    [AppFlowy-SelfHost-Commercial](https://github.com/AppFlowy-IO/AppFlowy-SelfHost-Commercial)
+    under its own commercial license, and AppFlowy-Cloud (AGPL-3.0) is archived.
 - App builders and their gate ([docs/app-builders.md](app-builders.md), [docs/sso.md](sso.md)),
   checked 2026-11-17, all run unmodified:
   - `quay.io/oauth2-proxy/oauth2-proxy` (v7.15.5, `gate` profile): MIT
@@ -362,7 +366,7 @@ docker compose -f docker-compose.yml -f compose.permissive.yaml --profile observ
 | Social posting       | Postiz (AGPL-3.0, `marketing` profile)     | none in compose: post natively, or run Mixpost Lite (MIT, Laravel + MySQL) separately          | One calendar for every network, scheduling, team approval. SerpBear (MIT) and the site are unaffected.                                                                                                 |
 | CRM                  | Twenty (AGPL-3.0, `crm` profile)           | none in compose: a SaaS CRM behind the same `Crm` class, or Krayin (MIT, Laravel) separately   | Customer records in the stack. The sync dry-runs until another CRM is wired in (docs/crm.md "Swapping the CRM").                                                                                       |
 | Secrets vault        | Vaultwarden (AGPL-3.0, `vault` profile)    | none in compose: connect `scripts/vault.mjs` to Bitwarden Cloud or a licensed Bitwarden server | The vault in the stack. The wrapper, the agent rules and the deploy flow are unchanged (docs/secrets.md "Connect").                                                                                    |
-| Team wiki            | Docmost (AGPL-3.0, `docmost` profile)      | none in compose: leave it off, or run BookStack (MIT, Laravel) separately                      | The wiki in the stack. Nothing else depends on it.                                                                                                                                                     |
+| Team wiki            | Docmost (AGPL-3.0, `docmost` profile)      | none in compose: connect AppFlowy (paid licence), or run BookStack (MIT) separately            | The wiki in the stack. Nothing else depends on it.                                                                                                                                                     |
 
 SBOMs and notices for a delivery: `pnpm run sbom` writes one CycloneDX SBOM per image (both
 twins, all profiles) and `THIRD_PARTY_NOTICES.md` to `dist/sbom/` (also a CI artifact on
