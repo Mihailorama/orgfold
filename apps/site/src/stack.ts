@@ -280,6 +280,13 @@ export const stack: { group: string; tools: Tool[] }[] = [
         href: 'https://github.com/towfiqi/serpbear',
       },
       {
+        name: 'OpenSEO',
+        role: 'SEO research: keywords, backlinks, site audits',
+        license: 'MIT',
+        images: ['ghcr.io/every-app/open-seo-standalone'],
+        href: 'https://github.com/every-app/open-seo',
+      },
+      {
         name: 'Plane',
         role: 'backlog: alerts, feedback and support requests become items',
         icon: 'plane',
@@ -340,4 +347,7 @@ export const notShown = [
   // ReportPortal's own router and queue, shown as part of ReportPortal.
   'traefik',
   'rabbitmq',
+  // OpenSEO's own state store and proxy, shown as part of OpenSEO.
+  'rustfs/rustfs',
+  'nginx',
 ];

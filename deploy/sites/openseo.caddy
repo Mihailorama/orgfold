@@ -1,0 +1,14 @@
+# Profile openseo (SEO research, docs/marketing.md): OPENSEO_PUBLIC_URL=https://seo.example.com.
+# Operators only: the gate first, then OpenSEO's own login. /mcp is let through for MCP clients,
+# which send an OpenSEO API key (Settings) that OpenSEO checks itself.
+{$OPENSEO_PUBLIC_URL} {
+	tls {$CADDY_TLS}
+	@mcp path /mcp /mcp/*
+	handle @mcp {
+		reverse_proxy openseo-web:80
+	}
+	route {
+		import gate_check
+		reverse_proxy openseo-web:80
+	}
+}
