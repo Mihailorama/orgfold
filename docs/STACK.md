@@ -38,6 +38,10 @@ observed use; raise it when a service is OOM-killed (`docker compose ps` shows e
 | caldiy           | booking       |               708 |        1024 |          - |
 | vault            | vault         |                44 |         128 |       0.0% |
 | vault-tls        | vault         |                12 |          64 |       0.0% |
+| openseo-runtime  | openseo       |           183-292 |        2048 |       2.9% |
+| openseo-storage  | openseo       |               407 |         768 |       2.6% |
+| openseo-crawl-gw | openseo       |                12 |         128 |       0.0% |
+| openseo-web      | openseo       |                 8 |          64 |       0.0% |
 
 Since ADR 0024 the worker imports LiteLLM: measured 2026-11-07, the worker process' RSS after
 importing the gateway is ~194 MiB (~81 MiB without LiteLLM), so its limit is now 512 MiB. The
@@ -58,6 +62,12 @@ restart with no traffic (1,381 MiB after a smoke test: register, one draft); its
 18-28 % of one core. SerpBear 71 MiB idle, 176 MiB after its smoke test (login, domain, keyword).
 Postiz's Temporal workers raise `temporal` to ~228 MiB and Postgres grows ~25 MiB; Redis is
 unchanged. Marketing profile ~1.3 / 2.6 GiB (used / limit) on top of the shared services.
+
+OpenSEO 0.1.31 (`openseo` profile, 2026-11-23, the demo server, no DataForSEO key): 183 MiB for
+the runtime right after start, 262-292 MiB after creating the admin account; RustFS ~400 MiB and
+steady (with a 256 MiB limit it restarted during the first start, hence 768). Profile ~0.7 / 3.0
+GiB (used / limit; the `openseo-init` one-shot, 512 MiB, runs only at start). Upstream sizes the
+runtime at 2 GiB and the whole stack at 1-2 GiB under use.
 The `support` rows (Chatwoot CE, measured 2026-11-07 after start-up, separately from the snapshot
 above) peak at ~442 / 572 MiB under a small load: plan ~1.1 GiB for the profile
 (docs/support.md). Since Chatwoot's database moved onto the stack's Postgres (2026-11-07, same

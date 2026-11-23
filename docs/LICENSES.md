@@ -37,6 +37,9 @@ on an image that is not. Their primary software licenses:
 | `saas-agent-starter-postgres`                      | Postgres 17 + pgvector extension (built)                        | PostgreSQL                  |
 | `ghcr.io/gitroomhq/postiz-app`                     | social post scheduling (`marketing` profile)                    | AGPL-3.0                    |
 | `towfiqi/serpbear`                                 | keyword rank tracking (`marketing` profile)                     | MIT                         |
+| `ghcr.io/every-app/open-seo-standalone`            | SEO research, OpenSEO (`openseo` profile)                       | MIT                         |
+| `rustfs/rustfs`                                    | OpenSEO's state store (`openseo` profile)                       | Apache-2.0                  |
+| `nginx`                                            | OpenSEO's proxy (`openseo` profile)                             | BSD-2-Clause                |
 | `twentycrm/twenty`                                 | CRM: people, companies, deals (`crm` profile)                   | AGPL-3.0 + app exception    |
 | `caldiy` (built from calcom/cal.diy)               | booking: "Book a demo" (`booking` profile)                      | MIT                         |
 | `vaultwarden/server`                               | secrets vault for humans and agents (`vault` profile)           | AGPL-3.0                    |
@@ -226,6 +229,14 @@ Notes:
     above) that the code gate rejects; nothing of it ships with the app.
   - External services, not shipped software: Google Search Console, Bing Webmaster Tools /
     IndexNow, the social networks Postiz posts to, the SERP scraper SerpBear is configured with.
+- SEO research, `openseo` profile ([docs/marketing.md](marketing.md)), checked 2026-11-23, all
+  run unmodified, as upstream's `deploy/standalone/compose.yaml` pins them:
+  - `ghcr.io/every-app/open-seo-standalone` (OpenSEO 0.1.31): MIT
+    ([LICENSE](https://github.com/every-app/open-seo/blob/main/LICENSE)). It runs on celld, Apache-2.0
+    ([denoland/celld](https://github.com/denoland/celld)), inside the same image.
+  - `rustfs/rustfs` (1.0.3): Apache-2.0 ([rustfs/rustfs](https://github.com/rustfs/rustfs)).
+  - `nginx` (1.28-alpine): the nginx license, BSD-2-Clause ([nginx.org/LICENSE](https://nginx.org/LICENSE)).
+  - External service, not shipped software: DataForSEO (or the treg.to reseller), paid per call.
 
 - CRM and booking ([docs/crm.md](crm.md), [ADR 0026](adr/0026-crm-and-booking.md)), checked
   2026-11-07:
