@@ -11,6 +11,7 @@ run it and what to check before each release. Decision record:
 | Lighthouse budgets | `apps/site/lighthouserc.cjs`, `.github/workflows/site.yml`  | CI on PRs touching the site         |
 | Social posting     | Postiz, `docker compose --profile marketing`                | optional container                  |
 | Rank tracking      | SerpBear, same profile                                      | optional container                  |
+| SEO research       | OpenSEO, `pnpm run infra -- add openseo` (production)       | optional, behind the gate           |
 | Search Console     | `pnpm seo:report`                                           | local / scheduled, read-only        |
 | Daily report       | `pnpm site:report`, `.github/workflows/site-report.yml`     | daily in a Telegram chat            |
 | Bing / IndexNow    | `pnpm seo:indexnow --since <last deployed sha>`             | after each site deploy              |
@@ -185,6 +186,49 @@ docker compose --profile marketing up -d serpbear   # UI http://localhost:3200 (
 - Maintenance: one maintainer, releases in bursts (3.1.0 in March 2026, 3.1.1-3.1.2 in late
   October 2026). If it stalls, the Search Console average position from `seo:report` is the free
   first-party fallback for your own site; competitor positions then need a paid SEO tool.
+
+## SEO research with OpenSEO
+
+[OpenSEO](https://github.com/every-app/open-seo) (MIT) is the open-source analog of Semrush or
+Ahrefs: keyword research, backlinks, rank tracking, site audits and an MCP endpoint for agents.
+It runs on the production server as the `openseo` component:
+
+```sh
+pnpm run infra -- add gate      # once: operators sign in with the app (docs/sso.md)
+pnpm run infra -- add openseo   # https://seo.<domain>
+```
+
+- **What it costs.** The software is free; the data is not. Keyword volumes, backlinks, SERPs and
+  rank checks come from [DataForSEO](https://dataforseo.com/), a third-party API paid per call from
+  a prepaid balance, no subscription. New accounts get $1 of free credit and the minimum top-up is
+  $50 (upstream's [key guide](https://github.com/every-app/open-seo/blob/main/docs/DATAFORSEO_API_KEY.md),
+  checked 2026-11-23). Without an account, a [treg.to](https://treg.to) token buys the same calls at
+  DataForSEO's rates with no minimum top-up (a reseller, shared account, for light use). OpenSEO
+  adds no markup. Budget for it before you rely on rank tracking: every tracked keyword is a
+  call on every check.
+- **The key.** `DATAFORSEO_API_KEY` is the "Base64" credential from DataForSEO's API Access page
+  (base64 of `login:password`), or set `TREG_API_TOKEN` instead. Put it from the vault into the env
+  and deploy (docs/secrets.md, "Vault to deploy"):
+  `node scripts/vault.mjs get seo/production DATAFORSEO_API_KEY --stdout | jq -Rs . | sops set --value-stdin deploy/env/production.enc.env '["DATAFORSEO_API_KEY"]'`,
+  then `pnpm run deploy -- production`. Without a key the app runs, and its banner and
+  `/api/health` say the key is missing.
+- **Who gets in.** Two locks: the gate (only operators with two-factor, docs/sso.md), then
+  OpenSEO's own email and password login. The first person to open it creates the admin account
+  and registration closes; teammates join from invitation links (Team settings). The gate is there
+  because OpenSEO's first visitor becomes admin and it spends a paid key: nobody outside the team
+  should reach the sign-up page, even for a minute after install. `/mcp` skips the gate so agents
+  can connect with an OpenSEO API key (Settings); OAuth sign-in from MCP clients does not pass the
+  gate, use the API key. Reset a password on the server:
+  `docker compose exec -T openseo-runtime node /opt/standalone/admin.mjs reset-password <email>`
+  (the password on stdin).
+- **Not wired yet** (add the variables to `openseo-init` in compose.prod.yaml when needed): SAM, its
+  AI agent (`OPENROUTER_API_KEY`), Search Console and Analytics linking (`GOOGLE_CLIENT_ID`/`_SECRET`),
+  JavaScript rendering for audits (`CONTEXT_API_KEY`).
+- **How it runs.** Upstream's Docker setup as is: the app on celld (a Cloudflare Workers runtime),
+  its database and files in its own RustFS bucket, Nginx in front, and a crawl gateway that lets
+  audits reach only public addresses. Its own `seo` network: no route to the app's Postgres or
+  Redis. ~0.6 GiB idle, limits 3 GiB (docs/STACK.md). Its volumes are not in the backups
+  (docs/backups.md).
 
 ## Daily report (`pnpm site:report`)
 

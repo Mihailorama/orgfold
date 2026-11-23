@@ -9,7 +9,8 @@
 # vault (Vaultwarden, the secrets vault, docs/secrets.md), analytics (Umami, docs/product-analytics.md),
 # gate (oauth2-proxy: the staff sign-in gate, docs/sso.md), openhands and bolt (app builders behind
 # the gate, docs/app-builders.md), hermes (a personal agent for staff behind the gate,
-# docs/app-builders.md), allure and reportportal (test reports, docs/test-reports.md).
+# docs/app-builders.md), allure and reportportal (test reports, docs/test-reports.md),
+# openseo (SEO research behind the gate, docs/marketing.md), docmost (team wiki, docs/wiki.md).
 # `pnpm run infra` (docs/setup.md) writes the env file and picks the profiles for you.
 # Licenses of every image: docs/LICENSES.md.
 
@@ -37,6 +38,14 @@ x-rp-env: &rp-env
   RP_AMQP_ANALYZER-VHOST: analyzer
   DATASTORE_TYPE: filesystem
 
+# OpenSEO's state bucket on its own RustFS (profile openseo, below).
+x-openseo-storage: &openseo-storage
+  CELLD_BUCKET: openseo
+  S3_ENDPOINT: http://openseo-storage:9000
+  AWS_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: openseo
+  AWS_SECRET_ACCESS_KEY: ${OPENSEO_STORAGE_SECRET:-}
+
 services:
   # Reverse proxy + automatic HTTPS (ADR 0016). The only service with public ports.
   caddy:
@@ -61,6 +70,8 @@ services:
       HERMES_SESSION_TOKEN: ${HERMES_SESSION_TOKEN:-}
       ALLURE_PUBLIC_URL: ${ALLURE_PUBLIC_URL:-}
       REPORTPORTAL_PUBLIC_URL: ${REPORTPORTAL_PUBLIC_URL:-}
+      OPENSEO_PUBLIC_URL: ${OPENSEO_PUBLIC_URL:-}
+      WIKI_PUBLIC_URL: ${WIKI_PUBLIC_URL:-}
       # vault site: who may reach Vaultwarden's /admin; everyone else gets 403
       VAULT_ADMIN_IPS: ${VAULT_ADMIN_IPS:-127.0.0.1/32}
     ports:
@@ -74,7 +85,7 @@ services:
       - caddy_config:/config
     # builders: the app builders' own network (below); Caddy and the gate are the only way in.
     # agents: Hermes' network, with Caddy and llm-cli only.
-    networks: [default, builders, tests, agents]
+    networks: [default, builders, tests, seo, agents]
 
   # One-shot: schema migrations + app role. scripts/deploy.mjs runs it with `docker compose run`
   # BEFORE `up`: within one `up`, Compose recreates api/worker/web before waiting for it, so a
@@ -145,6 +156,7 @@ services:
       - LLM_CLI_TOKEN
       - MAIL_FROM
       - CRM_PUBLIC_URL
+      - WIKI_PUBLIC_URL
       - UMAMI_PUBLIC_URL
       - VAULT_PUBLIC_URL
       - WEBHOOK_ENCRYPTION_KEYS
@@ -644,6 +656,75 @@ services:
     volumes: [twenty_data:/app/packages/twenty-server/.local-storage]
     depends_on: { twenty: { condition: service_healthy } }
 
+  # --- profile docmost: Docmost (AGPL-3.0 core, unmodified; docs/wiki.md), the team wiki at
+  # WIKI_PUBLIC_URL. Role + database `docmost` on the app's Postgres (docmost-db; the backups
+  # cover it), Redis db 5, files in the stack's S3, bucket DOCMOST_S3_BUCKET (created at start when
+  # missing; the backup overlay copies it). Its own login: SSO is a paid edition (docs/sso.md).
+  docmost-db:
+    profiles: [docmost]
+    image: postgres:17-alpine
+    logging: *logging
+    mem_limit: 64m
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGDATABASE: app
+      PGPASSWORD: ${POSTGRES_PASSWORD:-}
+      DB_PASSWORD: ${DOCMOST_DB_PASSWORD:-}
+      DB_NAME: docmost
+    entrypoint: ["/bin/sh", "/db-init.sh"]
+    volumes: ["./db-init.sh:/db-init.sh:ro"]
+    depends_on:
+      postgres: { condition: service_healthy, required: false }
+
+  docmost:
+    profiles: [docmost]
+    image: docmost/docmost:0.97.0@sha256:40c454d74ffdd9ecb15833e4d96f3a630d59aad862a1869381ae6ee086454419
+    logging: *logging
+    mem_limit: 768m
+    restart: unless-stopped
+    # Docmost does not create its bucket: do it first (any S3, the SDK is in the image).
+    working_dir: /app/apps/server
+    command:
+      - sh
+      - -c
+      - >-
+        node -e 'const s3=require("@aws-sdk/client-s3"), e=process.env, b={Bucket:e.AWS_S3_BUCKET};
+        const c=new s3.S3Client({region:e.AWS_S3_REGION,endpoint:e.AWS_S3_ENDPOINT||undefined,forcePathStyle:true,
+        credentials:{accessKeyId:e.AWS_S3_ACCESS_KEY_ID,secretAccessKey:e.AWS_S3_SECRET_ACCESS_KEY}});
+        c.send(new s3.HeadBucketCommand(b)).catch(()=>c.send(new s3.CreateBucketCommand(b)))
+        .catch((x)=>console.error("docmost: bucket "+b.Bucket+": "+x.name))' && cd /app && exec pnpm start
+    environment:
+      APP_URL: ${WIKI_PUBLIC_URL:-}
+      APP_SECRET: ${DOCMOST_APP_SECRET:-}
+      DATABASE_URL: postgresql://docmost:${DOCMOST_DB_PASSWORD:-}@postgres:5432/docmost
+      REDIS_URL: redis://redis:6379/5
+      STORAGE_DRIVER: s3
+      AWS_S3_ENDPOINT: ${S3_ENDPOINT:-}
+      AWS_S3_REGION: ${S3_REGION:-us-east-1}
+      AWS_S3_BUCKET: ${DOCMOST_S3_BUCKET:-docmost}
+      AWS_S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      AWS_S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      AWS_S3_FORCE_PATH_STYLE: "true"
+      DISABLE_TELEMETRY: "true"
+      # Invitations and password resets; no host = no mail (copy the invite link by hand).
+      MAIL_DRIVER: smtp
+      SMTP_HOST: ${DOCMOST_SMTP_HOST:-}
+      SMTP_PORT: ${DOCMOST_SMTP_PORT:-587}
+      SMTP_USERNAME: ${DOCMOST_SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${DOCMOST_SMTP_PASSWORD:-}
+      MAIL_FROM_ADDRESS: ${DOCMOST_MAIL_FROM:-}
+      MAIL_FROM_NAME: Docmost
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      start_period: 120s
+      retries: 12
+    depends_on:
+      docmost-db: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      s3: { condition: service_healthy, required: false }
+
   # --- profile vault: Vaultwarden (AGPL-3.0, unmodified) as the team's secrets vault for humans
   # and coding agents (docs/secrets.md). Its database lives on the app's Postgres server (create
   # role + database `vaultwarden`: vault-db), so the backups cover it. Reachable only
@@ -1053,6 +1134,106 @@ services:
     network_mode: none
     restart: "no"
 
+  # --- profile openseo: OpenSEO (MIT), SEO research: keywords, backlinks, rank tracking and site
+  # audits, the open-source Semrush analog (docs/marketing.md). Upstream's Docker setup
+  # (every-app/open-seo deploy/standalone, v0.1.31) as it is, names prefixed openseo-: the app runs
+  # on celld (a Workers runtime) with its database and files in its own RustFS bucket, Nginx in
+  # front. The image fixes the hosts `runtime` and `crawl-gateway`, so they are aliases on the `seo`
+  # network only (Caddy joins it). Operators reach it through the gate, then OpenSEO's own login.
+  # Keyword and site data come from DataForSEO, paid per call with the owner's DATAFORSEO_API_KEY
+  # (or TREG_API_TOKEN); without one the app runs and says what is missing.
+  openseo-storage:
+    profiles: [openseo]
+    image: rustfs/rustfs:1.0.3@sha256:9ca9559533b537d10482fe923288b676ad08f92a7069d9a17327fbae3cab688b
+    logging: *logging
+    mem_limit: 768m # measured: ~400 MiB idle; 256m restarts it during the first deploy
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: openseo
+      RUSTFS_SECRET_KEY: ${OPENSEO_STORAGE_SECRET:-}
+    volumes: [openseo_storage:/data]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [seo]
+  openseo-runtime:
+    profiles: [openseo]
+    image: ghcr.io/every-app/open-seo-standalone:0.1.31@sha256:12e9f062b70c90e6b51c882e8cf27c940b95cdf9929b2dbe4b06b15c032272bf
+    logging: *logging
+    mem_limit: 2g
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      <<: *openseo-storage
+      CELLD_MAX_RSS_MB: "1536"
+      CELLD_MAX_RESIDENT_CELLS: "64"
+      CELLD_V8_HEAP_LIMIT_MB: "256"
+      CELLD_MAX_REQUEST_BODY_BYTES: "33554432"
+      RUST_LOG: warn,cell_console=info
+    volumes: [openseo_runtime:/data, openseo_config:/config:ro]
+    depends_on:
+      openseo-storage: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 5
+    networks: { seo: { aliases: [runtime] } }
+  # One-shot at each start: secrets on the first run (openseo_config), the app's settings, the
+  # database migrations. Keys changed in the env apply on the next `up`, which runs it again.
+  openseo-init:
+    profiles: [openseo]
+    image: ghcr.io/every-app/open-seo-standalone:0.1.31@sha256:12e9f062b70c90e6b51c882e8cf27c940b95cdf9929b2dbe4b06b15c032272bf
+    logging: *logging
+    mem_limit: 512m
+    command: [sh, /opt/standalone/init.sh]
+    network_mode: service:openseo-runtime
+    environment:
+      <<: *openseo-storage
+      AUTH_MODE: password
+      BETTER_AUTH_URL: ${OPENSEO_PUBLIC_URL:-}
+      DATAFORSEO_API_KEY: ${DATAFORSEO_API_KEY:-}
+      TREG_API_TOKEN: ${TREG_API_TOKEN:-}
+    volumes: [openseo_config:/config, openseo_web:/web-config]
+    depends_on:
+      openseo-runtime: { condition: service_started }
+    restart: "no"
+  # Site audits fetch through it: public addresses on ports 80 and 443 only, never this network.
+  openseo-crawl-gateway:
+    profiles: [openseo]
+    image: ghcr.io/every-app/open-seo-standalone:0.1.31@sha256:12e9f062b70c90e6b51c882e8cf27c940b95cdf9929b2dbe4b06b15c032272bf
+    logging: *logging
+    mem_limit: 128m
+    restart: unless-stopped
+    command: [node, /opt/standalone/crawl-gateway.mjs]
+    volumes: [openseo_config:/config:ro]
+    depends_on:
+      openseo-init: { condition: service_completed_successfully }
+    networks: { seo: { aliases: [crawl-gateway] } }
+  openseo-web:
+    profiles: [openseo]
+    image: nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236
+    logging: *logging
+    mem_limit: 64m
+    restart: unless-stopped
+    # Written by openseo-init from the image (upstream's nginx.conf); nocopy keeps nginx's own
+    # default.conf out of the shared volume.
+    volumes:
+      - type: volume
+        source: openseo_web
+        target: /etc/nginx/conf.d
+        read_only: true
+        volume: { nocopy: true }
+    depends_on:
+      openseo-init: { condition: service_completed_successfully }
+      openseo-crawl-gateway: { condition: service_started }
+      # Nginx resolves `runtime` once at start: a new runtime container (an update) restarts it.
+      openseo-runtime: { condition: service_healthy, restart: true }
+    networks: [seo]
+
 volumes:
   caddy_data:
   caddy_config:
@@ -1068,11 +1249,16 @@ volumes:
   rp_opensearch:
   rp_storage:
   rp_analyzer:
+  openseo_storage:
+  openseo_runtime:
+  openseo_config: # secrets generated at the first start: keep it with the storage
+  openseo_web:
 
 networks:
   default:
   builders:
   tests:
+  seo:
   agents:
 
 configs:

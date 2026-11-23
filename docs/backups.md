@@ -39,13 +39,13 @@ restore check within a minute, then the schedule below. Watch it with
 
 ## What is backed up
 
-| Data                                                                                                                                                             | How                                               | Point in time            |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ------------------------ |
-| Postgres server, all databases: `app`, `temporal`, `temporal_visibility`                                                                                         | pgBackRest: WAL archive + weekly full, daily diff | any second in the window |
-| `glitchtip` (`glitchtip`), `umami` (`analytics`), `langfuse` (`llmops`), `postiz` (`marketing`), `twenty` (`crm`), `caldiy` (`booking`), `vaultwarden` (`vault`) | same: they live on the same Postgres server       | same                     |
-| `chatwoot` (`support`): conversations, contacts, messages                                                                                                        | same                                              | same                     |
-| Any database a future profile creates on this server                                                                                                             | same, automatically                               | same                     |
-| Buckets `attachments`, `ai-calls`, `langfuse`, `chatwoot` (`BACKUP_APP_BUCKETS`; missing = skipped)                                                              | rclone, hourly encrypted copy + dated versions    | hourly                   |
+| Data                                                                                                                                                                                    | How                                               | Point in time            |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ------------------------ |
+| Postgres server, all databases: `app`, `temporal`, `temporal_visibility`                                                                                                                | pgBackRest: WAL archive + weekly full, daily diff | any second in the window |
+| `glitchtip` (`glitchtip`), `umami` (`analytics`), `langfuse` (`llmops`), `postiz` (`marketing`), `twenty` (`crm`), `caldiy` (`booking`), `vaultwarden` (`vault`), `docmost` (`docmost`) | same: they live on the same Postgres server       | same                     |
+| `chatwoot` (`support`): conversations, contacts, messages                                                                                                                               | same                                              | same                     |
+| Any database a future profile creates on this server                                                                                                                                    | same, automatically                               | same                     |
+| Buckets `attachments`, `ai-calls`, `langfuse`, `chatwoot`, `docmost` (`BACKUP_APP_BUCKETS`; missing = skipped)                                                                          | rclone, hourly encrypted copy + dated versions    | hourly                   |
 
 **Not backed up:**
 
@@ -72,6 +72,11 @@ restore check within a minute, then the schedule below. Watch it with
   own Postgres, OpenSearch and file volumes (`rp_postgres`, `rp_opensearch`, `rp_storage`,
   `rp_analyzer`). Test history can be rebuilt by the next CI runs; ReportPortal's dashboards,
   users and triage decisions cannot. Dump `rp_postgres` with `pg_dump` if they matter.
+- **SEO research** (`openseo` profile, docs/marketing.md): OpenSEO's projects, trackers and
+  accounts live in its own RustFS bucket (`openseo_storage` volume) and the secrets it generated
+  at the first start in `openseo_config`; keep the two together. Stop the `openseo-*` services and
+  copy both volumes if that history matters; upstream's own backup script expects its own service
+  names and does not run against this stack.
 - **Marketing profile files**: Postiz uploads (`postiz-uploads` volume, `STORAGE_PROVIDER=local`)
   and SerpBear's SQLite data (`serpbear-data` volume). Postiz's database is covered (above).
   Copy those two volumes yourself if they matter, or point Postiz storage at a bucket listed in

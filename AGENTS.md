@@ -178,6 +178,7 @@ docs/quality.md     quality budgets: gate config hashes, suppression cap, AGENTS
 docs/updates.md     taking starter updates into a product: merge a release tag, conflicts, migration order
 docs/sso.md         staff single sign-on into the tools (Grafana, Vaultwarden, ...): who, how, per tool
 docs/app-builders.md agents behind the sign-in gate: app builders (OpenHands, bolt.diy), Hermes personal agent
+docs/wiki.md        team wiki: Docmost installed (stack's Postgres and S3, own login) or AppFlowy connected
 docs/test-reports.md  CI test results in Allure or ReportPortal (scripts/test-report.mjs), alerts
 ```
 

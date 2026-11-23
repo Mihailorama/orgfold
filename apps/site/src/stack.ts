@@ -246,6 +246,14 @@ export const stack: { group: string; tools: Tool[] }[] = [
         connect: 'Chatwoot Cloud',
       },
       {
+        name: 'Docmost',
+        role: 'team wiki and docs',
+        license: 'AGPL-3.0 + `ee/` commercial',
+        images: ['docmost/docmost'],
+        href: 'https://github.com/docmost/docmost',
+        connect: 'AppFlowy (paid licence for a team)',
+      },
+      {
         name: 'Twenty',
         role: 'CRM',
         license: 'AGPL-3.0 + app exception',
@@ -285,6 +293,13 @@ export const stack: { group: string; tools: Tool[] }[] = [
         license: 'MIT',
         images: ['towfiqi/serpbear'],
         href: 'https://github.com/towfiqi/serpbear',
+      },
+      {
+        name: 'OpenSEO',
+        role: 'SEO research: keywords, backlinks, site audits',
+        license: 'MIT',
+        images: ['ghcr.io/every-app/open-seo-standalone'],
+        href: 'https://github.com/every-app/open-seo',
       },
       {
         name: 'Plane',
@@ -347,4 +362,7 @@ export const notShown = [
   // ReportPortal's own router and queue, shown as part of ReportPortal.
   'traefik',
   'rabbitmq',
+  // OpenSEO's own state store and proxy, shown as part of OpenSEO.
+  'rustfs/rustfs',
+  'nginx',
 ];
