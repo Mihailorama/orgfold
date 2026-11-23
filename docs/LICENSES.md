@@ -41,6 +41,7 @@ on an image that is not. Their primary software licenses:
 | `rustfs/rustfs`                                    | OpenSEO's state store (`openseo` profile)                       | Apache-2.0                  |
 | `nginx`                                            | OpenSEO's proxy (`openseo` profile)                             | BSD-2-Clause                |
 | `twentycrm/twenty`                                 | CRM: people, companies, deals (`crm` profile)                   | AGPL-3.0 + app exception    |
+| `docmost/docmost`                                  | team wiki and docs (`docmost` profile)                          | AGPL-3.0 + `ee/` commercial |
 | `caldiy` (built from calcom/cal.diy)               | booking: "Book a demo" (`booking` profile)                      | MIT                         |
 | `vaultwarden/server`                               | secrets vault for humans and agents (`vault` profile)           | AGPL-3.0                    |
 | `quay.io/oauth2-proxy/oauth2-proxy`                | staff sign-in gate for tools without a login (`gate` profile)   | MIT                         |
@@ -261,6 +262,19 @@ Notes:
     `calcom/cal.com` image, v6.2.0 (2026-03-02, AGPL-3.0 with a commercial `ee/`), is unmaintained
     and not used. Cal.com Cloud, the documented alternative, is an external service. The web and
     the site load the booking host's `embed.js` by URL after consent: no npm dependency.
+- Team wiki ([docs/wiki.md](wiki.md)), checked 2026-11-23:
+  - `docmost/docmost` (Docmost 0.97.0, `docmost` profile, run unmodified): its
+    [README](https://github.com/docmost/docmost#license) says the core is AGPL-3.0
+    ([LICENSE](https://github.com/docmost/docmost/blob/main/LICENSE)) and the files under
+    `apps/server/src/ee`, `apps/client/src/ee` and `packages/ee` are under the Docmost Enterprise
+    license; those paid features (SSO, two-factor, AI) stay off without a license key. Not
+    distributed with the app. Its `docmost-db` one-shot reuses the `postgres` image. It is in
+    compose.prod.yaml only, so a delivery that bans AGPL leaves the component off (replacement
+    map below).
+  - AppFlowy (the `wiki` component's connect mode): nothing of it runs in the stack, we only link
+    to the client's own instance. The app is AGPL-3.0; its self-hosted server is
+    [AppFlowy-SelfHost-Commercial](https://github.com/AppFlowy-IO/AppFlowy-SelfHost-Commercial)
+    under its own commercial license, and AppFlowy-Cloud (AGPL-3.0) is archived.
 - App builders and their gate ([docs/app-builders.md](app-builders.md), [docs/sso.md](sso.md)),
   checked 2026-11-17, all run unmodified:
   - `quay.io/oauth2-proxy/oauth2-proxy` (v7.15.5, `gate` profile): MIT
@@ -363,6 +377,7 @@ docker compose -f docker-compose.yml -f compose.permissive.yaml --profile observ
 | Social posting       | Postiz (AGPL-3.0, `marketing` profile)     | none in compose: post natively, or run Mixpost Lite (MIT, Laravel + MySQL) separately          | One calendar for every network, scheduling, team approval. SerpBear (MIT) and the site are unaffected.                                                                                                 |
 | CRM                  | Twenty (AGPL-3.0, `crm` profile)           | none in compose: a SaaS CRM behind the same `Crm` class, or Krayin (MIT, Laravel) separately   | Customer records in the stack. The sync dry-runs until another CRM is wired in (docs/crm.md "Swapping the CRM").                                                                                       |
 | Secrets vault        | Vaultwarden (AGPL-3.0, `vault` profile)    | none in compose: connect `scripts/vault.mjs` to Bitwarden Cloud or a licensed Bitwarden server | The vault in the stack. The wrapper, the agent rules and the deploy flow are unchanged (docs/secrets.md "Connect").                                                                                    |
+| Team wiki            | Docmost (AGPL-3.0, `docmost` profile)      | none in compose: connect AppFlowy (paid licence), or run BookStack (MIT) separately            | The wiki in the stack. Nothing else depends on it.                                                                                                                                                     |
 
 SBOMs and notices for a delivery: `pnpm run sbom` writes one CycloneDX SBOM per image (both
 twins, all profiles) and `THIRD_PARTY_NOTICES.md` to `dist/sbom/` (also a CI artifact on

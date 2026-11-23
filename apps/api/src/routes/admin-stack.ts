@@ -213,8 +213,12 @@ export const adminStackRoutes: FastifyPluginAsyncZod<{ redis: Redis }> = async (
       const components = await Promise.all(
         catalog.map(async (c) => {
           const mode = modes.get(c.id) ?? null;
-          // "Open" only for tools people use in a browser; S3's site is an API endpoint.
-          const key = mode === 'install' && c.id !== 's3' ? c.install?.site : undefined;
+          // "Open" only for tools people use in a browser; S3's site is an API endpoint. A connected
+          // tool whose connect field is the same site key (wiki: AppFlowy) opens there.
+          const key =
+            (mode === 'install' || mode === 'connect') && c.id !== 's3'
+              ? c.install?.site
+              : undefined;
           const url = (key && z.url().safeParse(process.env[key]).data) || null;
           return {
             id: c.id,

@@ -636,6 +636,54 @@
       ]
     },
     {
+      "id": "wiki",
+      "title": "Team wiki",
+      "tier": "optional",
+      "group": "product",
+      "processor": false,
+      "description": "Team wiki and docs, a Notion alternative: install Docmost (free), or connect the AppFlowy you run (a team needs a paid AppFlowy licence) (docs/wiki.md)",
+      "ask": "Do you need a team wiki?",
+      "labels": {
+        "install": "yes: install Docmost on the server",
+        "connect": "I already run AppFlowy: link it",
+        "skip": "no wiki"
+      },
+      "modes": ["install", "connect", "skip"],
+      "requires": {
+        "install": ["postgres:install"]
+      },
+      "install": {
+        "profile": "docmost",
+        "ramMiB": 768,
+        "site": "WIKI_PUBLIC_URL",
+        "env": {
+          "WIKI_PUBLIC_URL": "https://docs.{domain}",
+          "DOCMOST_DB_PASSWORD": "{hex:24}",
+          "DOCMOST_APP_SECRET": "{hex:32}"
+        },
+        "rotate": ["DOCMOST_DB_PASSWORD"]
+      },
+      "connect": [
+        {
+          "key": "WIKI_PUBLIC_URL",
+          "prompt": "Your AppFlowy address (AppFlowy Cloud or your licensed self-host)",
+          "secret": false,
+          "validate": "^https://"
+        }
+      ],
+      "keys": [
+        "DOCMOST_S3_BUCKET",
+        "DOCMOST_SMTP_HOST",
+        "DOCMOST_SMTP_PORT",
+        "DOCMOST_SMTP_USERNAME",
+        "DOCMOST_SMTP_PASSWORD",
+        "DOCMOST_MAIL_FROM"
+      ],
+      "verify": {
+        "install": "docker compose exec -T docmost curl -fsS -o /dev/null http://127.0.0.1:3000/api/health"
+      }
+    },
+    {
       "id": "billing",
       "title": "Billing",
       "tier": "optional",
