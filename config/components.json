@@ -558,6 +558,30 @@
       }
     },
     {
+      "id": "openseo",
+      "title": "SEO research (OpenSEO)",
+      "tier": "optional",
+      "processor": false,
+      "description": "OpenSEO: keyword research, backlinks, rank tracking and site audits, an open-source Semrush analog, for operators behind the sign-in gate. Its data comes from DataForSEO, paid per call with your own key (DATAFORSEO_API_KEY or TREG_API_TOKEN), no subscription (docs/marketing.md)",
+      "modes": ["install", "skip"],
+      "requires": {
+        "install": ["gate:install"]
+      },
+      "install": {
+        "profile": "openseo",
+        "ramMiB": 3008,
+        "site": "OPENSEO_PUBLIC_URL",
+        "env": {
+          "OPENSEO_PUBLIC_URL": "https://seo.{domain}",
+          "OPENSEO_STORAGE_SECRET": "{hex:32}"
+        }
+      },
+      "keys": ["DATAFORSEO_API_KEY", "TREG_API_TOKEN"],
+      "verify": {
+        "install": "docker compose exec -T caddy wget -qO- http://openseo-web/api/health"
+      }
+    },
+    {
       "id": "crm",
       "title": "CRM (Twenty)",
       "tier": "optional",
