@@ -511,6 +511,32 @@
       }
     },
     {
+      "id": "hermes",
+      "title": "Personal agent (Hermes Agent)",
+      "tier": "optional",
+      "group": "product",
+      "processor": false,
+      "description": "Hermes Agent: a personal agent for staff with memory, skills and scheduled jobs, on the company's AI subscriptions through llm-cli or the model you set (docs/app-builders.md)",
+      "modes": ["install", "skip"],
+      "requires": {
+        "install": ["gate:install"]
+      },
+      "install": {
+        "profile": "hermes",
+        "ramMiB": 1024,
+        "site": "HERMES_PUBLIC_URL",
+        "env": {
+          "HERMES_PUBLIC_URL": "https://hermes.{domain}",
+          "HERMES_SESSION_TOKEN": "{hex:32}"
+        },
+        "rotate": ["HERMES_SESSION_TOKEN"]
+      },
+      "keys": ["HERMES_LLM_BASE_URL", "HERMES_LLM_MODEL", "HERMES_LLM_API_KEY"],
+      "verify": {
+        "install": "docker compose exec -T hermes curl -fsS -o /dev/null http://127.0.0.1:9119/api/status"
+      }
+    },
+    {
       "id": "allure",
       "title": "Test reports (Allure)",
       "tier": "optional",

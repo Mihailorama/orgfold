@@ -79,6 +79,13 @@ export const stack: { group: string; tools: Tool[] }[] = [
         href: 'https://github.com/stackblitz-labs/bolt.diy',
       },
       {
+        name: 'Hermes Agent',
+        role: 'a personal agent with memory for your team',
+        license: 'MIT',
+        images: ['nousresearch/hermes-agent'],
+        href: 'https://github.com/NousResearch/hermes-agent',
+      },
+      {
         name: 'Temporal',
         role: 'durable background jobs',
         license: 'MIT',
