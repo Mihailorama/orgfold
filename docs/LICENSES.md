@@ -47,6 +47,7 @@ on an image that is not. Their primary software licenses:
 | `quay.io/oauth2-proxy/oauth2-proxy`                | staff sign-in gate for tools without a login (`gate` profile)   | MIT                         |
 | `ghcr.io/openhands/agent-canvas`                   | app builder: coding agents on this server (`openhands` profile) | MIT                         |
 | `ghcr.io/stackblitz-labs/bolt.diy`                 | app builder in the browser (`bolt` profile)                     | MIT (+ WebContainers terms) |
+| `nousresearch/hermes-agent`                        | personal agent for staff (`hermes` profile)                     | MIT                         |
 | `frankescobar/allure-docker-service`               | test reports with history (`allure` profile)                    | Apache-2.0                  |
 | `reportportal/service-api`                         | ReportPortal API (`reportportal` profile)                       | Apache-2.0                  |
 | `reportportal/service-ui`                          | ReportPortal web UI (`reportportal` profile)                    | Apache-2.0                  |
@@ -288,6 +289,8 @@ Notes:
     in a commercial, for-profit setting (including for employees) needs a commercial license, and
     prototypes do not. That is a term of StackBlitz's service, not of the image: the catalog says
     it where the owner picks bolt.diy.
+  - `nousresearch/hermes-agent` (v0.23.3, `hermes` profile, checked 2026-11-23): MIT
+    ([LICENSE](https://github.com/NousResearch/hermes-agent/blob/main/LICENSE)), run unmodified.
 - Test reports ([docs/test-reports.md](test-reports.md)), checked 2026-11-17, all run unmodified:
   - `frankescobar/allure-docker-service` (2.44.0, `allure` profile): Apache-2.0
     ([LICENSE](https://github.com/fescobar/allure-docker-service/blob/master/LICENSE)); it bundles

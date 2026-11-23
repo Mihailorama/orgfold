@@ -64,6 +64,10 @@ restore check within a minute, then the schedule below. Watch it with
   conversations) and `openhands_projects` (the code its agents write) volumes. Push the apps you
   keep to a git repository from OpenHands; that is their backup. bolt.diy keeps projects in the
   visitor's browser.
+- **Personal agent** (docs/app-builders.md): Hermes' `hermes_data` volume (settings, sessions,
+  memories, skills, schedules, the agent's files). If the agent's memory matters,
+  `docker compose exec hermes hermes backup -o /opt/data/hermes-backup.zip` zips it (keys included:
+  keep it private); copy that file off the server. `hermes import <zip>` restores it.
 - **Test reports** (docs/test-reports.md): Allure's `allure_projects` volume and ReportPortal's
   own Postgres, OpenSearch and file volumes (`rp_postgres`, `rp_opensearch`, `rp_storage`,
   `rp_analyzer`). Test history can be rebuilt by the next CI runs; ReportPortal's dashboards,

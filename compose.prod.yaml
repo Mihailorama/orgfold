@@ -8,7 +8,8 @@
 # booking (Cal.diy, image built by CI from a pinned upstream commit, IMAGE_CALDIY),
 # vault (Vaultwarden, the secrets vault, docs/secrets.md), analytics (Umami, docs/product-analytics.md),
 # gate (oauth2-proxy: the staff sign-in gate, docs/sso.md), openhands and bolt (app builders behind
-# the gate, docs/app-builders.md), allure and reportportal (test reports, docs/test-reports.md),
+# the gate, docs/app-builders.md), hermes (a personal agent for staff behind the gate,
+# docs/app-builders.md), allure and reportportal (test reports, docs/test-reports.md),
 # openseo (SEO research behind the gate, docs/marketing.md), docmost (team wiki, docs/wiki.md).
 # `pnpm run infra` (docs/setup.md) writes the env file and picks the profiles for you.
 # Licenses of every image: docs/LICENSES.md.
@@ -64,6 +65,9 @@ services:
       GATE_PUBLIC_URL: ${GATE_PUBLIC_URL:-}
       OPENHANDS_PUBLIC_URL: ${OPENHANDS_PUBLIC_URL:-}
       BOLT_PUBLIC_URL: ${BOLT_PUBLIC_URL:-}
+      HERMES_PUBLIC_URL: ${HERMES_PUBLIC_URL:-}
+      # hermes site: Caddy hands Hermes its deployment token after the gate let the visitor in
+      HERMES_SESSION_TOKEN: ${HERMES_SESSION_TOKEN:-}
       ALLURE_PUBLIC_URL: ${ALLURE_PUBLIC_URL:-}
       REPORTPORTAL_PUBLIC_URL: ${REPORTPORTAL_PUBLIC_URL:-}
       OPENSEO_PUBLIC_URL: ${OPENSEO_PUBLIC_URL:-}
@@ -80,7 +84,8 @@ services:
       - caddy_data:/data # certificates and ACME account: keep this volume
       - caddy_config:/config
     # builders: the app builders' own network (below); Caddy and the gate are the only way in.
-    networks: [default, builders, tests, seo]
+    # agents: Hermes' network, with Caddy and llm-cli only.
+    networks: [default, builders, tests, seo, agents]
 
   # One-shot: schema migrations + app role. scripts/deploy.mjs runs it with `docker compose run`
   # BEFORE `up`: within one `up`, Compose recreates api/worker/web before waiting for it, so a
@@ -351,6 +356,8 @@ services:
       - LLM_CLI_CONFIG=${LLM_CLI_CONFIG:-/etc/llm-cli/config.json}
     volumes:
       - ${LLM_CLI_SECRETS_DIR:-./llm-cli-secrets}:/run/secrets/llm-cli
+    # agents: Hermes (profile hermes) reaches the subscriptions here, and nothing else of the stack.
+    networks: [default, agents]
 
   web:
     image: ${IMAGE_WEB:?no release, deploy with scripts/deploy.mjs}
@@ -855,6 +862,38 @@ services:
       retries: 12
     networks: [builders]
 
+  # Hermes Agent (MIT, NousResearch): a personal agent for staff with memory, skills and scheduled
+  # jobs; its web dashboard has the chat (docs/app-builders.md). It runs tools (shell, files,
+  # browser) inside this container, on the `hermes_data` volume; no Docker socket. It sits on the
+  # `agents` network with Caddy and llm-cli only: no route to Postgres, Redis, Temporal, the API
+  # or the app builders. The dashboard demands a credential on a non-loopback bind; Caddy sends the
+  # deployment token (HERMES_SESSION_TOKEN) only for visitors the gate let through. The model is
+  # pinned in the managed config below (/etc/hermes, read-only): a llm-cli subscription by default.
+  hermes:
+    profiles: [hermes]
+    image: nousresearch/hermes-agent:v0.23.3@sha256:3e9fe4c6ef36490f43aa0d0d80f9df64e9c92a576eee3042f1a97c8813c05355
+    logging: *logging
+    mem_limit: 2g
+    restart: unless-stopped
+    command: [gateway, run]
+    environment:
+      HERMES_DASHBOARD: "1"
+      HERMES_DASHBOARD_PUBLIC_URL: ${HERMES_PUBLIC_URL:-}
+      HERMES_DASHBOARD_SESSION_TOKEN: ${HERMES_SESSION_TOKEN:-}
+      # The model's key: llm-cli's token unless HERMES_LLM_BASE_URL points at another provider.
+      HERMES_LLM_API_KEY: ${HERMES_LLM_API_KEY:-${LLM_CLI_TOKEN:-}}
+    configs:
+      - source: hermes_managed
+        target: /etc/hermes/config.yaml
+    volumes:
+      - hermes_data:/opt/data # config, sessions, memories, skills, schedules, the agent's files
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:9119/api/status"]
+      interval: 10s
+      start_period: 60s
+      retries: 12
+    networks: [agents]
+
   # --- Test reports (docs/test-reports.md): CI sends each run's JUnit XML (scripts/test-report.mjs)
   # to one or both. They sit on the `tests` network, reachable only through Caddy.
   # Allure (Apache-2.0, allure-docker-service): a report per run with history and trends. CI signs
@@ -1204,6 +1243,7 @@ volumes:
   twenty_data:
   openhands_state:
   openhands_projects:
+  hermes_data:
   allure_projects:
   rp_postgres:
   rp_opensearch:
@@ -1219,9 +1259,20 @@ networks:
   builders:
   tests:
   seo:
+  agents:
 
-# ReportPortal: Traefik routes (upstream sets them as Docker labels) and RabbitMQ settings.
 configs:
+  # Hermes' managed config (docs/app-builders.md): the model, which its own settings cannot change.
+  # llm-cli answers without streaming, so streaming is off.
+  hermes_managed:
+    content: |
+      model:
+        provider: custom
+        base_url: ${HERMES_LLM_BASE_URL:-http://llm-cli:8080/claude/v1}
+        default: ${HERMES_LLM_MODEL:-claude-sonnet-5-5}
+        key_env: HERMES_LLM_API_KEY
+        streaming: false
+  # ReportPortal: Traefik routes (upstream sets them as Docker labels) and RabbitMQ settings.
   rp_routes:
     content: |
       http:

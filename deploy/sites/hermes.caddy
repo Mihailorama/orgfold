@@ -1,0 +1,13 @@
+# Profile hermes (personal agent for staff, docs/app-builders.md): HERMES_PUBLIC_URL=https://hermes.example.com.
+# Operators only: the gate (profile gate) signs them in with the app. Hermes refuses every request
+# without a credential, so Caddy adds its deployment token, replacing any the visitor sent, only
+# after the gate let the visitor through.
+{$HERMES_PUBLIC_URL} {
+	tls {$CADDY_TLS}
+	route {
+		import gate_check
+		reverse_proxy hermes:9119 {
+			header_up Authorization "Bearer {$HERMES_SESSION_TOKEN}"
+		}
+	}
+}

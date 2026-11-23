@@ -1,5 +1,12 @@
 # Known limitations / backlog
 
+- **Hermes on a subscription runs without tools** (ORGFOLD-122) (docs/app-builders.md). llm-cli
+  answers text only (`services/llm-cli/src/server.ts` ignores `tools`, rejects `tool` messages and
+  never streams), so Hermes on llm-cli chats but cannot run commands, browse or save memories.
+  Fix options: tool calling in llm-cli (map OpenAI `tools` to the CLI's own tool protocol, which
+  conflicts with the no-tools rule that keeps the logins unreadable) or a separate, scoped llm-cli
+  token for Hermes without access to `/logins` before any tool path is opened. Until then the full
+  agent needs `HERMES_LLM_*` pointed at a provider with tool calling.
 - **Typecheck: tsc 7 runs only on release tags** (ORGFOLD-120) (ADR 0011). On v0.3.0, tsc rejected
   `admin-stack.ts`: tsrs kept the literal type of a narrowed `c.group` (`=== 'base' || === 'product'`),
   tsc widened it to string. Fixed in code with `find()` over a const tuple, but it surfaced only after
