@@ -5,7 +5,7 @@
 # docs/support.md). Alpine's own pgvector package is built for its PostgreSQL 18, so it is
 # compiled here against the image's PostgreSQL 17 (pinned tarball, checksum verified). Only the
 # extension files are added; no database uses it unless it runs `create extension vector`.
-FROM postgres:17-alpine AS postgres
+FROM postgres:19-alpine AS postgres
 ARG PGVECTOR_VERSION=0.8.7
 ARG PGVECTOR_SHA256=cac0b10c360f05b2d521200105ba3697e773d4cd3731f5a915a7e37ebe0bea85
 RUN apk add --no-cache --virtual .build build-base curl \
